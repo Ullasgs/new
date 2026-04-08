@@ -1,0 +1,2115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart Insight Analyst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #0b0e17; color: #e5e5e5; margin: 0; overflow: hidden; }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+        .fade-in { animation: fadeIn 0.4s ease-in; }
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+        .badge-sm { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 4px; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em; }
+        .badge-rising { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .badge-falling { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .badge-sideways, .badge-flat { background: rgba(234,179,8,0.15); color: #eab308; }
+        .badge-r2 { background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+        .badge-accel { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .badge-decel { background: rgba(6,182,212,0.15); color: #06b6d4; }
+        .badge-consistent { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .badge-vol-low { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .badge-vol-moderate { background: rgba(234,179,8,0.15); color: #eab308; }
+        .badge-vol-high { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .badge-momentum-reversing { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .badge-momentum-decelerating { background: rgba(6,182,212,0.15); color: #06b6d4; }
+        .badge-momentum-accelerating { background: rgba(234,179,8,0.15); color: #eab308; }
+        .badge-momentum-steady { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .badge-meta { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+        .corr-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .corr-row:last-child { border-bottom: none; }
+        .sparkline-svg { display: inline-block; vertical-align: middle; margin-left: 6px; }
+        .pipeline-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .pipeline-line { width: 28px; height: 1px; background: rgba(255,255,255,0.2); }
+        .series-card { border-left: 3px solid; }
+        .chat-msg { max-width: 85%; }
+        .chat-msg-user { margin-left: auto; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.25); }
+        .chat-msg-bot { margin-right: auto; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+        .overlay-checkbox { appearance: none; width: 14px; height: 14px; border: 1px solid #555; border-radius: 3px; background: transparent; cursor: pointer; position: relative; }
+        .overlay-checkbox:checked { background: #3b82f6; border-color: #3b82f6; }
+        .overlay-checkbox:checked::after { content: '\2713'; position: absolute; top: -2px; left: 1px; font-size: 11px; color: white; }
+        /* Tooltip for SVG data points */
+        #svgTooltip { position: absolute; pointer-events: none; z-index: 100; background: rgba(15,17,25,0.95); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #e5e5e5; min-width: 180px; max-width: 280px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); backdrop-filter: blur(8px); display: none; transition: opacity 0.15s; }
+        #svgTooltip .tt-series { font-weight: 700; font-size: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        #svgTooltip .tt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        #svgTooltip .tt-row { display: flex; justify-content: space-between; padding: 2px 0; }
+        #svgTooltip .tt-label { color: #9ca3af; }
+        #svgTooltip .tt-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+        #svgTooltip .tt-divider { border-top: 1px solid rgba(255,255,255,0.08); margin: 5px 0; }
+        .hover-point { cursor: crosshair; opacity: 0; transition: opacity 0.15s; }
+        .hover-point:hover { opacity: 1; }
+        .json-tab-pulse { animation: jsonPulse 0.6s ease-out; }
+        @keyframes jsonPulse { 0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5); } 100% { box-shadow: 0 0 0 0 transparent; } }
+        #rawJSON.json-highlight { border-color: rgba(59,130,246,0.6) !important; }
+        .json-locator { position:absolute; bottom:6px; right:10px; font-size:9px; color:#3b82f6; background:rgba(15,17,25,0.9); padding:1px 8px; border-radius:4px; border:1px solid rgba(59,130,246,0.3); pointer-events:none; z-index:10; display:none; }
+        .json-editor-wrap { position:relative; }
+        .json-editor-wrap textarea, .json-editor-wrap .json-highlight-layer { font-family: 'Courier New', monospace; font-size: 10px; line-height: 16px; padding: 8px; margin:0; border:none; white-space: pre; overflow-wrap: normal; word-wrap: normal; }
+        .json-highlight-layer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden; border-radius:4px; z-index:0; }
+        .json-highlight-layer .jhl-line { display:block; height:16px; width:100%; }
+        .json-highlight-layer .jhl-line.jhl-active { background: rgba(59,130,246,0.15); border-left: 2px solid #3b82f6; }
+        #rawJSON { position:relative; z-index:1; background:transparent !important; caret-color: #e5e5e5; }
+        .comp-tooltip { position:absolute; pointer-events:none; z-index:100; background:rgba(15,17,25,0.95); border:1px solid rgba(255,255,255,0.15); border-radius:8px; padding:8px 12px; font-size:10px; color:#e5e5e5; min-width:140px; max-width:240px; box-shadow:0 8px 24px rgba(0,0,0,0.5); display:none; }
+        .nar-section { margin-bottom: 10px; }
+        .nar-section:last-child { margin-bottom: 0; }
+        .nar-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #3b82f6; margin-bottom: 4px; }
+        .nar-summary { color: #e5e5e5; font-weight: 500; line-height: 1.6; }
+        .nar-bullets { list-style: none; padding: 0; margin: 0; }
+        .nar-bullets li { position: relative; padding-left: 14px; margin-bottom: 5px; color: #d1d5db; line-height: 1.55; }
+        .nar-bullets li::before { content: '\2022'; position: absolute; left: 0; color: #3b82f6; font-weight: 700; }
+        .resize-handle { position: absolute; top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; z-index: 50; display: flex; align-items: center; justify-content: center; }
+        .resize-handle::after { content: ''; width: 40px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.15); transition: background 0.2s; }
+        .resize-handle:hover::after, .resize-handle.active::after { background: #3b82f6; }
+    </style>
+</head>
+<body>
+
+<!-- TOP HEADER BAR -->
+<header class="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#0b0e17] z-50" style="height:42px;">
+    <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6m6 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0h6m4-10v10"/></svg>
+        </div>
+        <span class="text-sm font-semibold">Chart Insight Analyst</span>
+    </div>
+    <!-- Pipeline Indicator -->
+    <div id="pipeline" class="flex items-center gap-1 text-[10px] text-gray-500">
+        <span class="pipeline-dot bg-gray-600"></span><span>UPLOAD</span>
+        <span class="pipeline-line"></span>
+        <span class="pipeline-dot bg-gray-600"></span><span>PARSE</span>
+        <span class="pipeline-line"></span>
+        <span class="pipeline-dot bg-gray-600"></span><span>ANALYZE</span>
+        <span class="pipeline-line"></span>
+        <span class="pipeline-dot bg-gray-600"></span><span>LLM</span>
+        <span class="pipeline-line"></span>
+        <span class="pipeline-dot bg-gray-600"></span><span>DONE</span>
+    </div>
+    <div class="flex items-center gap-3">
+        <select id="chartSelector" onchange="selectChart(this.value)" class="bg-transparent border border-white/10 rounded px-2 py-1 text-xs text-gray-400 max-w-[220px]">
+            <option value="">Select a chart...</option>
+        </select>
+        <button onclick="triggerUpload()" class="px-3 py-1 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs rounded transition">New Chart</button>
+        <input type="file" id="fileInput" accept=".svg" multiple class="hidden" onchange="handleFiles(this.files)">
+        <span id="userEmail" class="text-xs text-gray-400 hidden"></span>
+        <button id="logoutBtn" onclick="logout()" class="hidden px-2 py-1 bg-white/5 border border-white/10 hover:bg-red-600/20 text-gray-400 hover:text-red-400 text-xs rounded transition">Logout</button>
+    </div>
+</header>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen" class="fixed inset-0 bg-[#0b0e17] z-[60] flex items-center justify-center">
+    <div class="w-full max-w-sm mx-4">
+        <div class="text-center mb-8">
+            <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6m6 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0h6m4-10v10"/></svg>
+            </div>
+            <h1 class="text-xl font-bold">Chart Insight Analyst</h1>
+            <p class="text-xs text-gray-500 mt-1">Sign in to analyze your charts</p>
+        </div>
+        <div class="glass rounded-xl p-5">
+            <div class="flex mb-5">
+                <button onclick="switchAuthTab('login')" id="authLoginTab" class="flex-1 pb-2 text-xs font-semibold text-center border-b-2 border-blue-500 text-blue-400">LOGIN</button>
+                <button onclick="switchAuthTab('signup')" id="authSignupTab" class="flex-1 pb-2 text-xs font-semibold text-center border-b-2 border-transparent text-gray-500">SIGN UP</button>
+            </div>
+            <div id="authError" class="hidden mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"></div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Email</label>
+                    <input id="authEmail" type="email" placeholder="you@example.com"
+                           class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500/50 transition" />
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Password</label>
+                    <input id="authPassword" type="password" placeholder="••••••••"
+                           class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500/50 transition"
+                           onkeydown="if(event.key==='Enter') submitAuth()" />
+                </div>
+                <button onclick="submitAuth()" id="authSubmitBtn"
+                        class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WELCOME STATE -->
+<div id="welcome" class="flex items-center justify-center" style="height:calc(100vh - 42px);">
+    <div class="text-center max-w-md">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-600/20 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+        </div>
+        <h2 class="text-xl font-semibold mb-2">Chart Insight Analyst</h2>
+        <p class="text-sm text-gray-400 mb-6">Upload SVG financial charts to automatically extract trends, detect anomalies, and generate analyst-style commentary.</p>
+        <div class="flex gap-3 justify-center">
+            <button onclick="triggerUpload()" class="px-5 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm rounded-lg transition">Upload SVG</button>
+            <button onclick="loadDemo()" class="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-medium rounded-lg transition shadow-lg shadow-blue-500/20">
+                Load Demo Charts
+            </button>
+        </div>
+        <div id="dropzone" class="mt-6 border-2 border-dashed border-white/15 rounded-xl p-6 hover:border-blue-500/50 transition cursor-pointer"
+             ondrop="handleDrop(event)" ondragover="event.preventDefault(); this.classList.add('border-blue-500')" ondragleave="this.classList.remove('border-blue-500')"
+             onclick="triggerUpload()">
+            <p class="text-xs text-gray-500">or drag and drop SVG files here</p>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN ANALYSIS VIEW -->
+<div id="analysisView" class="hidden" style="height:calc(100vh - 42px); display:none;">
+    <!-- Sub-header with chart metadata -->
+    <div class="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#0d1019]" style="height:36px;">
+        <div class="flex items-center gap-3">
+            <span id="chartTitle" class="text-sm font-semibold text-white"></span>
+            <span id="metaPeriod" class="badge-meta hidden"></span>
+            <span id="metaUnit" class="badge-meta hidden"></span>
+            <span id="metaType" class="badge-meta hidden"></span>
+            <span id="metaSeries" class="badge-meta hidden"></span>
+        </div>
+        <span id="metaSource" class="text-[10px] text-gray-500"></span>
+    </div>
+
+    <!-- Main split: Chart left + Panel right -->
+    <div class="flex" id="mainSplit" style="height:calc(100% - 36px);">
+        <!-- LEFT: Chart area -->
+        <div class="flex-1 flex flex-col min-w-0" style="border-right: 1px solid rgba(255,255,255,0.08);">
+            <!-- Chart overlay controls -->
+            <div class="flex items-center gap-4 px-4 py-1 text-[10px] text-gray-500 border-b border-white/5" style="height:24px;">
+                <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="ovOverlays" class="overlay-checkbox" checked onchange="updateOverlays()"> OVERLAYS</label>
+                <label class="flex items-center gap-1 cursor-pointer text-gray-600"><input type="checkbox" id="ovPeaks" class="overlay-checkbox" onchange="updateOverlays()"> Peaks</label>
+                <label class="flex items-center gap-1 cursor-pointer text-gray-600"><input type="checkbox" id="ovTroughs" class="overlay-checkbox" onchange="updateOverlays()"> Troughs</label>
+                <label class="flex items-center gap-1 cursor-pointer text-gray-600"><input type="checkbox" id="ovTrendlines" class="overlay-checkbox" onchange="updateOverlays()"> Trend lines</label>
+            </div>
+            <!-- Chart display: original SVG -->
+            <div class="flex-1 p-0 relative" id="chartArea" style="background: #0f1117; border-radius: 6px; margin: 4px; overflow: hidden;">
+                <div id="zoomControls" style="position:absolute;top:8px;right:8px;z-index:20;display:none;" class="flex flex-col gap-1">
+                    <button onclick="zoomChart(1.25)" class="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-sm font-bold flex items-center justify-center transition" title="Zoom In">+</button>
+                    <button onclick="zoomChart(0.8)" class="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-sm font-bold flex items-center justify-center transition" title="Zoom Out">&minus;</button>
+                    <button onclick="zoomReset()" class="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-[9px] font-bold flex items-center justify-center transition" title="Reset Zoom">1:1</button>
+                </div>
+                <div id="svgWrapper" style="width:100%;height:100%;overflow:hidden;">
+                    <img id="svgDisplay" src="" alt="Chart" style="width:100%; height:100%; object-fit:contain; display:none;">
+                    <svg id="hoverOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none;"></svg>
+                </div>
+                <div id="svgTooltip"></div>
+                <canvas id="mainChart" style="display:none;"></canvas>
+            </div>
+        </div>
+
+        <!-- RIGHT: Tabbed panel -->
+        <div id="rightPanel" class="flex flex-col flex-shrink-0" style="width:42%;">
+            <div class="flex gap-4 px-4 border-b border-white/10 text-xs" style="height:32px; align-items:end;">
+                <button onclick="switchRightTab('series')" class="pb-1 tab-active font-semibold" data-rtab="series">SERIES</button>
+                <button onclick="switchRightTab('multiseries')" class="pb-1 text-gray-500 hover:text-gray-300 font-semibold" data-rtab="multiseries">MULTI-SERIES</button>
+                <button onclick="switchRightTab('json')" class="pb-1 text-gray-500 hover:text-gray-300 font-semibold" data-rtab="json">JSON</button>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                <div id="rtab-series" class="rtab-content p-3 space-y-3"></div>
+                <div id="rtab-multiseries" class="rtab-content hidden p-4">
+                    <h3 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-3">Pairwise Correlations</h3>
+                    <div id="pairwiseTable"></div>
+                    <div id="noCorrelations" class="hidden text-xs text-gray-500 py-4 text-center">Not enough series for correlations</div>
+                </div>
+                <div id="rtab-json" class="rtab-content hidden p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] text-gray-500 uppercase tracking-wider">Structured Insight JSON</span>
+                        <div class="flex gap-2">
+                            <button onclick="copyJSON()" class="text-[10px] text-blue-400 hover:text-blue-300">Copy</button>
+                            <button onclick="resetJSON()" id="resetJSONBtn" class="text-[10px] text-yellow-400 hover:text-yellow-300 hidden">Reset</button>
+                            <button onclick="saveEditedJSON()" class="text-[10px] px-2 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded transition">Save &amp; Compare</button>
+                        </div>
+                    </div>
+                    <div class="json-editor-wrap" style="position:relative;">
+                        <div id="jsonHighlightLayer" class="json-highlight-layer"></div>
+                        <textarea id="rawJSON" class="w-full text-[10px] text-gray-300 border border-white/10 rounded p-2 font-mono leading-relaxed focus:outline-none focus:border-blue-500/50 resize-none" style="max-height: calc(100vh - 200px); min-height: 300px; background: #0a0d14;" spellcheck="false" oninput="syncHighlightLayer()" onscroll="syncHighlightScroll()"></textarea>
+                        <div id="jsonLocator" class="json-locator"></div>
+                    </div>
+                    <div id="jsonError" class="text-[10px] text-red-400 mt-1 hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- BOTTOM PANEL: Commentary + Chatbot -->
+<div id="bottomPanel" class="hidden border-t border-white/10 bg-[#0d1019]" style="position:fixed; bottom:0; left:0; right:0; z-index:40; height:252px;">
+    <div class="resize-handle" id="resizeHandle"></div>
+    <div class="flex items-center justify-between px-4" style="height:32px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <div class="flex items-center gap-4">
+            <button onclick="switchBottomTab('commentary')" class="text-xs font-semibold pb-0 text-blue-400 border-b-2 border-blue-400" data-btab="commentary">COMMENTARY</button>
+            <button onclick="switchBottomTab('chatbot')" class="text-xs font-semibold pb-0 text-gray-500 hover:text-gray-300" data-btab="chatbot">ASK DATA</button>
+            <span id="llmBadge" class="badge-sm badge-r2 ml-2"></span>
+            <span id="llmAttempts" class="text-[10px] text-gray-500"></span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="regenerateWithTone('neutral')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-medium rounded transition">
+                Regenerate
+            </button>
+            <button onclick="copyNarrative()" class="px-3 py-1 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-[11px] rounded transition">Copy</button>
+            <div class="relative">
+                <button onclick="toggleExportMenu()" class="px-3 py-1 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-[11px] rounded transition flex items-center gap-1">
+                    Export <span class="text-[8px]">&#9662;</span>
+                </button>
+                <div id="exportMenu" class="hidden absolute bottom-full mb-1 right-0 w-36 bg-[#1a1a2e] border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <button onclick="exportAs('json')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition">Export JSON</button>
+                    <button onclick="exportAs('csv')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition">Export CSV</button>
+                    <button onclick="exportAs('txt')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition">Export TXT</button>
+                </div>
+            </div>
+            <button onclick="toggleBottomPanel()" id="bottomToggleBtn" class="text-gray-400 hover:text-white ml-2 text-sm">&#9660;</button>
+        </div>
+    </div>
+    <!-- Commentary content -->
+    <div id="btab-commentary" class="btab-content px-4 py-3 overflow-y-auto" style="height:calc(100% - 32px);">
+        <div id="narrativeText" class="text-sm text-gray-300 leading-relaxed"></div>
+        <p id="disclaimer" class="text-[9px] text-orange-400/70 mt-3 hidden">Commentary is derived strictly from chart data. No external events, causes, or forecasts are inferred. All numeric values originate from deterministic SVG parsing and are subject to &plusmn;0.5px coordinate precision.</p>
+    </div>
+    <!-- Chatbot content -->
+    <div id="btab-chatbot" class="btab-content hidden" style="height:calc(100% - 32px);">
+        <div id="chatMessages" class="px-4 py-2 overflow-y-auto space-y-2" style="height:calc(100% - 40px);"></div>
+        <div class="flex items-center gap-2 px-4 py-2 border-t border-white/5">
+            <input type="text" id="chatInput" placeholder="Ask about the data... e.g. 'What is the USD trend?'" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50" onkeydown="if(event.key==='Enter')sendChatMessage()">
+            <button onclick="sendChatMessage()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition">Send</button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="text-center">
+        <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <p id="loadingText" class="text-xs text-gray-300">Processing...</p>
+    </div>
+</div>
+
+<script>
+// === STATE ===
+const API = '';
+let charts = {};
+let svgData = {};  // raw SVG data URLs per chart_id
+let activeChartId = null;
+let chartInstance = null;
+let bottomExpanded = true;
+let chatHistory = [];
+let jsonHighlightActive = false;
+let currentZoom = 1;
+let authToken = localStorage.getItem('nova_token');
+let authMode = 'login';
+
+// === AUTH ===
+function switchAuthTab(mode) {
+    authMode = mode;
+    document.getElementById('authLoginTab').className = mode === 'login'
+        ? 'flex-1 pb-2 text-xs font-semibold text-center border-b-2 border-blue-500 text-blue-400'
+        : 'flex-1 pb-2 text-xs font-semibold text-center border-b-2 border-transparent text-gray-500';
+    document.getElementById('authSignupTab').className = mode === 'signup'
+        ? 'flex-1 pb-2 text-xs font-semibold text-center border-b-2 border-blue-500 text-blue-400'
+        : 'flex-1 pb-2 text-xs font-semibold text-center border-b-2 border-transparent text-gray-500';
+    document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Login' : 'Sign Up';
+    document.getElementById('authError').classList.add('hidden');
+}
+
+async function submitAuth() {
+    var email = document.getElementById('authEmail').value.trim();
+    var password = document.getElementById('authPassword').value;
+    var errorEl = document.getElementById('authError');
+    errorEl.classList.add('hidden');
+    if (!email || !password) { errorEl.textContent = 'Enter email and password'; errorEl.classList.remove('hidden'); return; }
+    if (authMode === 'signup' && password.length < 6) { errorEl.textContent = 'Password must be at least 6 characters'; errorEl.classList.remove('hidden'); return; }
+    var endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/signup';
+    try {
+        var r = await fetch(API + endpoint, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email:email, password:password}) });
+        var data = await r.json();
+        if (!r.ok) { errorEl.textContent = data.detail || 'Authentication failed'; errorEl.classList.remove('hidden'); return; }
+        if (data.access_token) {
+            authToken = data.access_token;
+            localStorage.setItem('nova_token', authToken);
+            localStorage.setItem('nova_email', data.email);
+            showApp(data.email);
+        }
+    } catch(e) { errorEl.textContent = 'Connection error'; errorEl.classList.remove('hidden'); }
+}
+
+function showApp(email) {
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('userEmail').textContent = email;
+    document.getElementById('userEmail').classList.remove('hidden');
+    document.getElementById('logoutBtn').classList.remove('hidden');
+}
+
+function logout() {
+    authToken = null;
+    localStorage.removeItem('nova_token');
+    localStorage.removeItem('nova_email');
+    charts = {}; activeChartId = null; svgData = {};
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('userEmail').classList.add('hidden');
+    document.getElementById('logoutBtn').classList.add('hidden');
+    document.getElementById('welcome').style.display = '';
+    var av = document.getElementById('analysisView');
+    av.classList.add('hidden'); av.style.display = 'none';
+    document.getElementById('bottomPanel').classList.add('hidden');
+    document.getElementById('chartSelector').innerHTML = '<option value="">Select a chart...</option>';
+}
+
+// Check existing token on load
+(async function initAuth() {
+    if (authToken) {
+        try {
+            var r = await fetch(API + '/api/auth/me', { headers: {'Authorization': 'Bearer ' + authToken} });
+            if (r.ok) { var user = await r.json(); showApp(user.email); return; }
+        } catch(e) {}
+        localStorage.removeItem('nova_token');
+        localStorage.removeItem('nova_email');
+        authToken = null;
+    }
+    document.getElementById('authScreen').classList.remove('hidden');
+})();
+let panX = 0, panY = 0, isPanning = false, panStartX = 0, panStartY = 0;
+let originalInsightJSON = {};  // stores original JSON per chart_id
+let modifiedInsight = null;    // stores modified insight after edit
+
+// === API ===
+function authHeaders() { return authToken ? {'Authorization': 'Bearer ' + authToken} : {}; }
+async function apiGet(path) {
+    const r = await fetch(API + path, { headers: authHeaders() });
+    if (r.status === 401) { logout(); throw new Error('Session expired'); }
+    if (!r.ok) throw new Error('API ' + r.status);
+    return r.json();
+}
+async function apiPost(path, body) {
+    const r = await fetch(API + path, {
+        method: 'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify(body)
+    });
+    if (r.status === 401) { logout(); throw new Error('Session expired'); }
+    if (!r.ok) throw new Error('API ' + r.status);
+    return r.json();
+}
+
+// === ANALYTICS ===
+function linearRegression(values) {
+    const n = values.length;
+    if (n < 2) return { slope: 0, r2: 0, intercept: 0 };
+    let sumX=0, sumY=0, sumXY=0, sumX2=0;
+    for (let i = 0; i < n; i++) { sumX+=i; sumY+=values[i]; sumXY+=i*values[i]; sumX2+=i*i; }
+    const denom = n*sumX2 - sumX*sumX;
+    if (denom === 0) return { slope:0, r2:0, intercept:0 };
+    const slope = (n*sumXY - sumX*sumY)/denom;
+    const intercept = (sumY - slope*sumX)/n;
+    const mean = sumY/n;
+    const ssRes = values.reduce((s,y,i)=>s+(y-(intercept+slope*i))**2,0);
+    const ssTot = values.reduce((s,y)=>s+(y-mean)**2,0);
+    const r2 = ssTot===0 ? 0 : Math.max(0, 1-ssRes/ssTot);
+    return { slope, r2, intercept };
+}
+
+function findPeaksAndTroughs(values, labels, order=3) {
+    const peaks=[], troughs=[];
+    for (let i=order; i<values.length-order; i++) {
+        let isPeak=true, isTrough=true;
+        for (let j=1; j<=order; j++) {
+            if (values[i]<=values[i-j]||values[i]<=values[i+j]) isPeak=false;
+            if (values[i]>=values[i-j]||values[i]>=values[i+j]) isTrough=false;
+        }
+        if (isPeak) peaks.push({label:labels[i],value:values[i]});
+        if (isTrough) troughs.push({label:labels[i],value:values[i]});
+    }
+    peaks.sort((a,b)=>b.value-a.value);
+    troughs.sort((a,b)=>a.value-b.value);
+    return { peaks:peaks.slice(0,5), troughs:troughs.slice(0,5) };
+}
+
+function classifyVolatility(values) {
+    const mean = values.reduce((a,b)=>a+b,0)/values.length;
+    if (mean===0) return 'LOW';
+    const cv = Math.sqrt(values.reduce((s,v)=>s+(v-mean)**2,0)/values.length)/Math.abs(mean)*100;
+    return cv < 10 ? 'LOW' : cv < 25 ? 'MODERATE' : 'HIGH';
+}
+
+function classifyMomentum(values) {
+    if (values.length<6) return 'STEADY';
+    const mid = Math.floor(values.length/2);
+    const r1 = linearRegression(values.slice(0,mid));
+    const r2 = linearRegression(values.slice(mid));
+    const range = Math.max(...values)-Math.min(...values);
+    const th = range*0.01;
+    if ((r1.slope>th&&r2.slope<-th)||(r1.slope<-th&&r2.slope>th)) return 'REVERSING';
+    if (Math.abs(r2.slope)>Math.abs(r1.slope)*1.3) return 'ACCELERATING';
+    if (Math.abs(r2.slope)<Math.abs(r1.slope)*0.7) return 'DECELERATING';
+    return 'STEADY';
+}
+
+function getRecentTrend(values, labels) {
+    const rc = Math.max(5, Math.floor(values.length*0.2));
+    const rv = values.slice(-rc), rl = labels.slice(-rc);
+    const reg = linearRegression(rv);
+    const range = Math.max(...rv)-Math.min(...rv);
+    const th = range*0.02;
+    let dir = Math.abs(reg.slope)<th ? 'SIDEWAYS' : reg.slope>0 ? 'RISING' : 'FALLING';
+    const fullReg = linearRegression(values);
+    let accel = Math.abs(reg.slope)>Math.abs(fullReg.slope)*1.3 ? 'ACCELERATING' :
+                Math.abs(reg.slope)<Math.abs(fullReg.slope)*0.7 ? 'DECELERATING' : 'CONSISTENT';
+    return { direction:dir, accel, startLabel:rl[0], endLabel:rl[rl.length-1] };
+}
+
+function getOverallTrend(values) {
+    const reg = linearRegression(values);
+    const range = Math.max(...values)-Math.min(...values);
+    const th = range*0.02;
+    return Math.abs(reg.slope)<th ? 'SIDEWAYS' : reg.slope>0 ? 'RISING' : 'FALLING';
+}
+
+function r2Lbl(r2) { return r2>=0.7?'HIGH':r2>=0.3?'MODERATE':'LOW'; }
+
+function sparkSVG(values, color, w=50, h=16) {
+    if (values.length<2) return '';
+    const mn=Math.min(...values), mx=Math.max(...values), rng=mx-mn||1;
+    const step=w/(values.length-1);
+    const pts = values.map((v,i)=> (i*step).toFixed(1)+','+(h-((v-mn)/rng)*h).toFixed(1)).join(' ');
+    return '<svg class="sparkline-svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><polyline fill="none" stroke="'+(color||'#6b7280')+'" stroke-width="1.5" points="'+pts+'"/></svg>';
+}
+
+function computeSeriesAnalytics(s) {
+    const values = s.data_points.map(function(p){return p.value;});
+    const labels = s.data_points.map(function(p){return p.x_label;});
+    if (values.length<3) return null;
+    const reg = linearRegression(values);
+    var pt = findPeaksAndTroughs(values,labels);
+    const volatility = classifyVolatility(values);
+    const momentum = classifyMomentum(values);
+    const recent = getRecentTrend(values,labels);
+    const overall = getOverallTrend(values);
+    const ySpan = parseFloat(labels[labels.length-1])-parseFloat(labels[0]);
+    const slopePerYr = ySpan>0 ? (reg.slope*values.length/ySpan) : reg.slope;
+    return { overallTrend:overall, r2:reg.r2, r2Label:r2Lbl(reg.r2), slope:reg.slope, slopePerYear:slopePerYr,
+             volatility:volatility, momentum:momentum, recent:recent, peaks:pt.peaks, troughs:pt.troughs,
+             latestValue:values[values.length-1], range:{min:Math.min.apply(null,values),max:Math.max.apply(null,values)},
+             sparkline:sparkSVG(values,s.color), reg:reg };
+}
+
+// === PIPELINE ===
+function setPipelineStep(step) {
+    var steps = ['UPLOAD','PARSE','ANALYZE','LLM','DONE'];
+    var dots = document.querySelectorAll('#pipeline .pipeline-dot');
+    var idx = steps.indexOf(step);
+    dots.forEach(function(d,i) {
+        d.className = 'pipeline-dot ' + (i<=idx ? 'bg-green-500' : 'bg-gray-600');
+    });
+}
+
+// === RENDER SERIES CARDS ===
+function renderSeriesCards(insight) {
+    var container = document.getElementById('rtab-series');
+    var html = '';
+    insight.series.forEach(function(s) {
+        var a = computeSeriesAnalytics(s);
+        if (!a) return;
+        var color = s.color || '#3b82f6';
+        var tIcon = a.overallTrend==='RISING'?'&#8593;':a.overallTrend==='FALLING'?'&#8595;':'&#8594;';
+        var tCls = a.overallTrend==='RISING'?'badge-rising':a.overallTrend==='FALLING'?'badge-falling':'badge-sideways';
+        var rIcon = a.recent.direction==='RISING'?'&#8593;':a.recent.direction==='FALLING'?'&#8595;':'&#8594;';
+        var rCls = a.recent.direction==='RISING'?'badge-rising':a.recent.direction==='FALLING'?'badge-falling':'badge-sideways';
+        var aCls = a.recent.accel==='ACCELERATING'?'badge-accel':a.recent.accel==='DECELERATING'?'badge-decel':'badge-consistent';
+        var vCls = 'badge-vol-'+a.volatility.toLowerCase();
+        var mCls = 'badge-momentum-'+a.momentum.toLowerCase();
+
+        var peaksHtml = '';
+        a.peaks.forEach(function(p){ peaksHtml += '<div class="text-gray-300"><span class="text-gray-500">'+p.label+':</span> <b>'+p.value.toFixed(2)+'</b></div>'; });
+        if (a.peaks.length===0) peaksHtml = '<div class="text-gray-600">None</div>';
+
+        var troughsHtml = '';
+        a.troughs.forEach(function(t){ troughsHtml += '<div class="text-gray-300"><span class="text-gray-500">'+t.label+':</span> <b>'+t.value.toFixed(2)+'</b></div>'; });
+        if (a.troughs.length===0) troughsHtml = '<div class="text-gray-600">None</div>';
+
+        html += '<div class="series-card glass rounded-lg p-3 fade-in" style="border-left-color:'+color+'">' +
+            '<div class="flex items-center justify-between mb-2">' +
+                '<div class="flex items-center gap-1.5">' +
+                    '<span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:'+color+'"></span>' +
+                    '<span class="text-sm font-bold">'+s.name+'</span>' +
+                    a.sparkline +
+                '</div>' +
+                '<span class="text-xl font-bold tabular-nums">'+a.latestValue.toFixed(2)+'</span>' +
+            '</div>' +
+            '<div class="flex items-center gap-1.5 flex-wrap mb-1.5">' +
+                '<span class="badge-sm '+tCls+'">'+tIcon+' '+a.overallTrend+'</span>' +
+                '<span class="badge-sm badge-r2">'+a.r2Label+' (R&sup2; '+a.r2.toFixed(2)+')</span>' +
+                '<span class="text-[10px] text-gray-400">slope '+(a.slopePerYear>=0?'+':'')+a.slopePerYear.toFixed(3)+'/yr</span>' +
+            '</div>' +
+            '<div class="flex items-center gap-1.5 flex-wrap mb-3">' +
+                '<span class="text-[9px] uppercase tracking-wider text-gray-500 font-semibold">Recent</span>' +
+                '<span class="badge-sm '+rCls+'">'+rIcon+' '+a.recent.direction+'</span>' +
+                '<span class="badge-sm '+aCls+'">'+a.recent.accel+'</span>' +
+                '<span class="text-[10px] text-gray-500">'+a.recent.startLabel+'-'+a.recent.endLabel+'</span>' +
+            '</div>' +
+            '<div class="grid grid-cols-3 gap-3 mb-3 text-[11px]">' +
+                '<div><div class="text-[9px] uppercase tracking-wider text-gray-500 mb-0.5">Range</div><div class="font-semibold">'+a.range.min.toFixed(1)+' &ndash; '+a.range.max.toFixed(1)+'</div></div>' +
+                '<div><div class="text-[9px] uppercase tracking-wider text-gray-500 mb-0.5">Volatility</div><span class="badge-sm '+vCls+'">'+a.volatility+'</span></div>' +
+                '<div><div class="text-[9px] uppercase tracking-wider text-gray-500 mb-0.5">Momentum</div><span class="badge-sm '+mCls+'">'+a.momentum+'</span></div>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 gap-3 text-[10px]">' +
+                '<div><div class="text-green-400 font-semibold mb-0.5">&#9650; PEAKS ('+a.peaks.length+')</div>'+peaksHtml+'</div>' +
+                '<div><div class="text-red-400 font-semibold mb-0.5">&#9660; TROUGHS ('+a.troughs.length+')</div>'+troughsHtml+'</div>' +
+            '</div>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+}
+
+// === RENDER CORRELATIONS ===
+function renderPairwiseCorrelations(insight) {
+    var table = document.getElementById('pairwiseTable');
+    var noData = document.getElementById('noCorrelations');
+    var corrs = insight.correlations || [];
+    if (!corrs.length) { table.innerHTML=''; noData.classList.remove('hidden'); return; }
+    noData.classList.add('hidden');
+    var html = '';
+    corrs.forEach(function(c) {
+        var v = c.pearson_r;
+        var clr = Math.abs(v)>0.5&&v<0?'text-orange-400':Math.abs(v)>0.3&&v<0?'text-red-400':Math.abs(v)>0.5&&v>0?'text-cyan-400':'text-gray-400';
+        html += '<div class="corr-row"><span class="text-xs text-gray-300">'+c.series_a+' &times; '+c.series_b+'</span><span class="text-xs font-bold tabular-nums '+clr+'">'+v.toFixed(3)+'</span></div>';
+    });
+    table.innerHTML = html;
+}
+
+// === RENDER EXTRACTED SVG (RECONSTRUCTED FROM PARSED DATA) ===
+function renderExtractedSVG(chartId) {
+    var data = charts[chartId];
+    if (!data) return;
+    var insight = data.insight;
+    var chartArea = document.getElementById('chartArea');
+    var tooltip = document.getElementById('svgTooltip');
+
+    // Hide legacy renderers
+    document.getElementById('svgDisplay').style.display = 'none';
+    document.getElementById('hoverOverlay').style.display = 'none';
+    document.getElementById('mainChart').style.display = 'none';
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    var prev = document.getElementById('extractedSVG');
+    if (prev) prev.remove();
+
+    var ns = 'http://www.w3.org/2000/svg';
+    var isBar = insight.metadata.chart_type === 'bar_horizontal';
+
+    function el(tag, attrs) {
+        var e = document.createElementNS(ns, tag);
+        if (attrs) Object.keys(attrs).forEach(function(k) { e.setAttribute(k, String(attrs[k])); });
+        return e;
+    }
+    function txt(x, y, t, attrs) {
+        var a = Object.assign({x:x, y:y, fill:'#ccc', 'font-size':'14', 'font-family':'Arial,sans-serif'}, attrs||{});
+        var e = el('text', a);
+        e.textContent = t;
+        return e;
+    }
+
+    var svg = el('svg', {
+        id: 'extractedSVG',
+        viewBox: '0 0 960 720',
+        preserveAspectRatio: 'xMidYMid meet',
+        xmlns: ns
+    });
+    svg.style.cssText = 'width:100%;height:100%;border-radius:4px;display:block;';
+    currentZoom = 1; panX = 0; panY = 0;
+    _applyZoomPan(svg);
+
+    // Background
+    svg.appendChild(el('rect', {x:0, y:0, width:960, height:720, fill:'#0f1117', rx:6}));
+
+    // Title
+    svg.appendChild(txt(20, 40, insight.metadata.title||'', {fill:'#fff','font-size':'28','font-weight':'bold'}));
+
+    // Subtitle
+    if (insight.metadata.subtitle) svg.appendChild(txt(20, 68, insight.metadata.subtitle, {fill:'#d0d0d0','font-size':'17'}));
+
+    // Source
+    if (insight.metadata.source) svg.appendChild(txt(500, 712, insight.metadata.source, {fill:'#666','font-size':'14','font-style':'italic'}));
+
+    // Extraction summary badge (proves completeness)
+    var totalPts = insight.series.reduce(function(s,se){return s+se.data_points.length;},0);
+    var xLen = ((insight.x_axis||{}).labels||[]).length;
+    var yLen = ((insight.y_axis||{}).labels||[]).length;
+    svg.appendChild(txt(940, 16, 'Extracted: '+totalPts+' pts \u2022 '+xLen+' x-labels \u2022 '+yLen+' y-labels \u2022 '+insight.series.length+' series', {'font-size':'10', fill:'#555', 'text-anchor':'end'}));
+
+    // Plot area
+    var pa = insight.plot_area || {};
+    pa = {x: pa.x||130, y: pa.y||90, width: pa.width||800, height: pa.height||520};
+    var xLabels = (insight.x_axis||{}).labels||[];
+    var xPixels = (insight.x_axis||{}).pixel_positions||[];
+    var yLabels = (insight.y_axis||{}).labels||[];
+    var yPixels = (insight.y_axis||{}).pixel_positions||[];
+
+    // Axis lines
+    svg.appendChild(el('line', {x1:pa.x, y1:pa.y, x2:pa.x, y2:pa.y+pa.height, stroke:'#444', 'stroke-width':'1'}));
+    svg.appendChild(el('line', {x1:pa.x, y1:pa.y+pa.height, x2:pa.x+pa.width, y2:pa.y+pa.height, stroke:'#444', 'stroke-width':'1'}));
+
+    if (isBar) {
+        _drawBarChart(svg, el, txt, ns, insight, pa, xLabels, xPixels, yLabels, yPixels, tooltip, chartArea);
+    } else {
+        _drawLineChart(svg, el, txt, ns, insight, pa, xLabels, xPixels, yLabels, yPixels, tooltip, chartArea);
+    }
+
+    chartArea.querySelector('#svgWrapper').appendChild(svg);
+    document.getElementById('zoomControls').style.display = 'flex';
+    _setupZoomEvents();
+}
+
+function _drawBarChart(svg, el, txt, ns, insight, pa, xLabels, xPixels, yLabels, yPixels, tooltip, chartArea) {
+    // X-axis: value gridlines + labels
+    for (var i = 0; i < xLabels.length; i++) {
+        var xp = xPixels[i];
+        svg.appendChild(el('line', {x1:xp, y1:pa.y, x2:xp, y2:pa.y+pa.height, stroke:'rgba(255,255,255,0.06)', 'stroke-width':'1', 'stroke-dasharray':'4,4'}));
+        svg.appendChild(el('line', {x1:xp, y1:pa.y+pa.height, x2:xp, y2:pa.y+pa.height+8, stroke:'#555', 'stroke-width':'1'}));
+        svg.appendChild(txt(xp, pa.y+pa.height+28, xLabels[i], {'font-size':'18', 'text-anchor':'middle', fill:'#aaa'}));
+    }
+
+    // Y-axis: category labels + ticks
+    for (var j = 0; j < yLabels.length; j++) {
+        var yp = yPixels[j];
+        svg.appendChild(el('line', {x1:pa.x-5, y1:yp, x2:pa.x, y2:yp, stroke:'#555', 'stroke-width':'1'}));
+        svg.appendChild(txt(pa.x-10, yp+5, yLabels[j], {'font-size':'14', 'text-anchor':'end', fill:'#ccc'}));
+    }
+
+    // Bars
+    var series = insight.series[0];
+    if (!series) return;
+
+    var sorted = series.data_points.slice().sort(function(a,b){return b.value-a.value;});
+    var maxVal = sorted[0] ? sorted[0].value : 1;
+    var vals = series.data_points.map(function(dp){return dp.value;});
+    var meanVal = vals.reduce(function(a,b){return a+b;},0) / vals.length;
+    var minVal = Math.min.apply(null, vals);
+    var maxValAll = Math.max.apply(null, vals);
+
+    var barH = 13;
+    if (series.data_points.length > 1) {
+        barH = Math.abs(series.data_points[1].y_pixel - series.data_points[0].y_pixel) * 0.72;
+    }
+
+    series.data_points.forEach(function(dp, idx) {
+        var barW = Math.max(dp.x_pixel - pa.x, 1);
+        var barY = dp.y_pixel - barH / 2;
+        var pct = maxVal > 0 ? dp.value / maxVal : 0;
+        var hue = (1 - pct) * 220;
+        var barColor = 'hsl(' + hue + ',70%,50%)';
+
+        var bar = el('rect', {x:pa.x, y:barY, width:barW, height:barH, fill:barColor, rx:2, opacity:'0.9', 'pointer-events':'none'});
+        svg.appendChild(bar);
+
+        // Value label at bar end
+        svg.appendChild(txt(dp.x_pixel + 5, dp.y_pixel + 4, dp.value.toFixed(1), {'font-size':'11', fill:'#999', 'pointer-events':'none'}));
+
+        // Full-width hover zone
+        var hover = el('rect', {x:0, y:barY-2, width:960, height:barH+4, fill:'transparent'});
+        hover.style.cursor = 'crosshair';
+
+        var rank = sorted.findIndex(function(s){return s.x_label===dp.x_label;}) + 1;
+
+        (function(dp, bar, hover, rank, pct, barColor, idx) {
+            hover.addEventListener('mouseenter', function(e) {
+                bar.setAttribute('opacity','1');
+                bar.setAttribute('stroke','#fff');
+                bar.setAttribute('stroke-width','2');
+                highlightJSONPoint(series.name, idx);
+                var diff = dp.value - meanVal;
+                var html = '<div class="tt-series"><span class="tt-dot" style="background:'+barColor+'"></span>' + dp.x_label + '</div>';
+                html += '<div class="tt-row"><span class="tt-label">Value</span><span class="tt-value" style="font-size:14px;color:#fff">' + dp.value.toFixed(2) + '%</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">Rank</span><span class="tt-value">#' + rank + ' of ' + series.data_points.length + '</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">% of Max</span><span class="tt-value">' + (pct*100).toFixed(1) + '%</span></div>';
+                html += '<div class="tt-divider"></div>';
+                html += '<div class="tt-row"><span class="tt-label">Mean</span><span class="tt-value">' + meanVal.toFixed(2) + '%</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">vs Mean</span><span class="tt-value" style="color:' + (diff>=0?'#22c55e':'#ef4444') + '">' + (diff>=0?'+':'') + diff.toFixed(2) + '</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">Min / Max</span><span class="tt-value">' + minVal.toFixed(2) + ' \u2013 ' + maxValAll.toFixed(2) + '</span></div>';
+                html += '<div class="tt-divider"></div>';
+                html += '<div style="text-align:center;font-size:9px;color:#3b82f6;margin-top:2px;">\u2190 JSON synced in panel</div>';
+                (insight.anomalies||[]).forEach(function(a) {
+                    if (a.x_label === dp.x_label) {
+                        html += '<div class="tt-divider"></div>';
+                        html += '<div class="tt-row"><span class="tt-label">\u26A0 Anomaly</span><span class="tt-value" style="color:#f59e0b">z=' + a.z_score.toFixed(2) + ' (severity ' + (a.severity*100).toFixed(0) + '%)</span></div>';
+                    }
+                });
+                tooltip.innerHTML = html;
+                tooltip.style.display = 'block';
+                positionTooltip(e, tooltip, chartArea);
+            });
+            hover.addEventListener('mousemove', function(e) { positionTooltip(e, tooltip, chartArea); });
+            hover.addEventListener('mouseleave', function() {
+                bar.setAttribute('opacity','0.9');
+                bar.removeAttribute('stroke');
+                bar.removeAttribute('stroke-width');
+                tooltip.style.display = 'none';
+                clearJSONHighlight();
+            });
+        })(dp, bar, hover, rank, pct, barColor, idx);
+
+        svg.appendChild(hover);
+    });
+}
+
+function _drawLineChart(svg, el, txt, ns, insight, pa, xLabels, xPixels, yLabels, yPixels, tooltip, chartArea) {
+    // Y-axis: value gridlines + labels
+    for (var i = 0; i < yLabels.length; i++) {
+        var yp = yPixels[i];
+        svg.appendChild(el('line', {x1:pa.x, y1:yp, x2:pa.x+pa.width, y2:yp, stroke:'rgba(255,255,255,0.06)', 'stroke-width':'1'}));
+        svg.appendChild(el('line', {x1:pa.x-5, y1:yp, x2:pa.x, y2:yp, stroke:'#555', 'stroke-width':'1'}));
+        svg.appendChild(txt(pa.x-10, yp+5, yLabels[i], {'font-size':'15', 'text-anchor':'end', fill:'#aaa'}));
+    }
+
+    // X-axis: time gridlines + labels
+    for (var j = 0; j < xLabels.length; j++) {
+        var xp = xPixels[j];
+        svg.appendChild(el('line', {x1:xp, y1:pa.y, x2:xp, y2:pa.y+pa.height, stroke:'rgba(255,255,255,0.06)', 'stroke-width':'1'}));
+        svg.appendChild(el('line', {x1:xp, y1:pa.y+pa.height, x2:xp, y2:pa.y+pa.height+8, stroke:'#555', 'stroke-width':'1'}));
+        svg.appendChild(txt(xp, pa.y+pa.height+24, xLabels[j], {'font-size':'15', 'text-anchor':'middle', fill:'#aaa'}));
+    }
+
+    // Vertical crosshair line (follows mouse)
+    var crosshair = el('line', {x1:0, y1:pa.y, x2:0, y2:pa.y+pa.height, stroke:'rgba(255,255,255,0.15)', 'stroke-width':'1', 'stroke-dasharray':'3,3', display:'none', 'pointer-events':'none'});
+
+    // Series: polylines + area fills + hover circles + legend
+    var legX = pa.x, legY = pa.y + pa.height + 50;
+
+    insight.series.forEach(function(s, si) {
+        var color = s.color || 'hsl(' + (si*45) + ',70%,55%)';
+
+        // Area fill
+        if (insight.metadata.chart_type === 'area' && s.data_points.length > 1) {
+            var apts = s.data_points.map(function(dp){return dp.x_pixel+','+dp.y_pixel;}).join(' ');
+            apts += ' ' + s.data_points[s.data_points.length-1].x_pixel + ',' + (pa.y+pa.height);
+            apts += ' ' + s.data_points[0].x_pixel + ',' + (pa.y+pa.height);
+            svg.appendChild(el('polygon', {points:apts, fill:color, 'fill-opacity':'0.12', stroke:'none', 'pointer-events':'none'}));
+        }
+
+        // Polyline
+        if (s.data_points.length > 0) {
+            var pts = s.data_points.map(function(dp){return dp.x_pixel+','+dp.y_pixel;}).join(' ');
+            svg.appendChild(el('polyline', {points:pts, fill:'none', stroke:color, 'stroke-width':'2', 'stroke-linejoin':'round', 'pointer-events':'none'}));
+        }
+
+        // Legend
+        svg.appendChild(el('line', {x1:legX, y1:legY-4, x2:legX+16, y2:legY-4, stroke:color, 'stroke-width':'3', 'pointer-events':'none'}));
+        svg.appendChild(txt(legX+22, legY, s.name, {'font-size':'12', fill:'#bbb', 'pointer-events':'none'}));
+        legX += Math.max(s.name.length * 7, 40) + 40;
+        if (legX > 920) { legX = pa.x; legY += 18; }
+
+        // Hover circles for each data point
+        var analytics = computeSeriesAnalytics(s);
+        var baseR = Math.max(3, 6 - Math.floor(s.data_points.length / 30));
+
+        s.data_points.forEach(function(dp, idx) {
+            var c = el('circle', {cx:dp.x_pixel, cy:dp.y_pixel, r:baseR, fill:color, stroke:'#0f1117', 'stroke-width':'2', opacity:'0'});
+            c.style.cssText = 'cursor:crosshair;transition:opacity 0.12s;';
+
+            (function(dp, idx, c, analytics, color, baseR, sName) {
+                c.addEventListener('mouseenter', function(e) {
+                    c.setAttribute('opacity','1');
+                    c.setAttribute('r', baseR + 3);
+                    crosshair.setAttribute('x1', dp.x_pixel);
+                    crosshair.setAttribute('x2', dp.x_pixel);
+                    crosshair.setAttribute('display', 'inherit');
+                    highlightJSONPoint(sName, idx);
+
+                    var html = '<div class="tt-series"><span class="tt-dot" style="background:'+color+'"></span>' + s.name + '</div>';
+                    html += '<div class="tt-row"><span class="tt-label">Period</span><span class="tt-value">' + dp.x_label + '</span></div>';
+                    html += '<div class="tt-row"><span class="tt-label">Value</span><span class="tt-value" style="font-size:14px;color:#fff">' + dp.value.toFixed(2) + '</span></div>';
+                    html += '<div class="tt-row"><span class="tt-label">Point</span><span class="tt-value">' + (idx+1) + ' of ' + s.data_points.length + '</span></div>';
+
+                    if (idx > 0) {
+                        var prev = s.data_points[idx-1].value;
+                        var chg = dp.value - prev;
+                        var chgPct = prev !== 0 ? (chg / Math.abs(prev) * 100) : 0;
+                        html += '<div class="tt-row"><span class="tt-label">Change</span><span class="tt-value" style="color:' + (chg>=0?'#22c55e':'#ef4444') + '">' + (chg>=0?'+':'') + chg.toFixed(2) + ' (' + (chgPct>=0?'+':'') + chgPct.toFixed(1) + '%)</span></div>';
+                    }
+
+                    if (analytics) {
+                        var isPeak = analytics.peaks.some(function(p){return p.label===dp.x_label && Math.abs(p.value-dp.value)<0.01;});
+                        var isTrough = analytics.troughs.some(function(t){return t.label===dp.x_label && Math.abs(t.value-dp.value)<0.01;});
+                        if (isPeak) html += '<div class="tt-row"><span class="tt-label">Signal</span><span class="tt-value" style="color:#22c55e">\u25B2 Peak</span></div>';
+                        if (isTrough) html += '<div class="tt-row"><span class="tt-label">Signal</span><span class="tt-value" style="color:#ef4444">\u25BC Trough</span></div>';
+                    }
+
+                    (insight.anomalies||[]).forEach(function(a) {
+                        if (a.series_name===s.name && a.x_label===dp.x_label) {
+                            html += '<div class="tt-divider"></div>';
+                            html += '<div class="tt-row"><span class="tt-label">\u26A0 Anomaly</span><span class="tt-value" style="color:#f59e0b">z=' + a.z_score.toFixed(2) + '</span></div>';
+                            html += '<div class="tt-row"><span class="tt-label">Severity</span><span class="tt-value" style="color:#f59e0b">' + (a.severity*100).toFixed(0) + '%</span></div>';
+                        }
+                    });
+
+                    if (analytics) {
+                        html += '<div class="tt-divider"></div>';
+                        html += '<div class="tt-row"><span class="tt-label">Range</span><span class="tt-value">' + analytics.range.min.toFixed(2) + ' \u2013 ' + analytics.range.max.toFixed(2) + '</span></div>';
+                        html += '<div class="tt-row"><span class="tt-label">Trend</span><span class="tt-value">' + analytics.overallTrend + ' (R\u00B2=' + analytics.r2.toFixed(2) + ')</span></div>';
+                    }
+
+                    html += '<div class="tt-divider"></div>';
+                    html += '<div style="text-align:center;font-size:9px;color:#3b82f6;margin-top:2px;">\u2190 JSON synced in panel</div>';
+
+                    tooltip.innerHTML = html;
+                    tooltip.style.display = 'block';
+                    positionTooltip(e, tooltip, chartArea);
+                });
+                c.addEventListener('mousemove', function(e) { positionTooltip(e, tooltip, chartArea); });
+                c.addEventListener('mouseleave', function() {
+                    c.setAttribute('opacity','0');
+                    c.setAttribute('r', baseR);
+                    crosshair.setAttribute('display', 'none');
+                    tooltip.style.display = 'none';
+                    clearJSONHighlight();
+                });
+            })(dp, idx, c, analytics, color, baseR, s.name);
+
+            svg.appendChild(c);
+        });
+    });
+
+    // Crosshair on top
+    svg.appendChild(crosshair);
+}
+
+// === DISPLAY ORIGINAL SVG (LEGACY) ===
+function renderOriginalSVG(chartId) {
+    var svgImg = document.getElementById('svgDisplay');
+    var canvas = document.getElementById('mainChart');
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    canvas.style.display = 'none';
+
+    if (svgData[chartId]) {
+        svgImg.src = svgData[chartId];
+        svgImg.style.display = 'block';
+    } else {
+        svgImg.src = API + '/api/charts/' + chartId + '/svg';
+        svgImg.style.display = 'block';
+    }
+
+    // Build hover overlay after image loads
+    svgImg.onload = function() {
+        buildHoverOverlay(chartId);
+    };
+    // If already cached, fire immediately
+    if (svgImg.complete && svgImg.naturalWidth > 0) {
+        buildHoverOverlay(chartId);
+    }
+}
+
+function buildHoverOverlay(chartId) {
+    var data = charts[chartId];
+    if (!data) return;
+    var insight = data.insight;
+    var overlay = document.getElementById('hoverOverlay');
+    var tooltip = document.getElementById('svgTooltip');
+    var chartArea = document.getElementById('chartArea');
+    var svgImg = document.getElementById('svgDisplay');
+
+    // SVG viewBox is 960x720 for all LSEG charts
+    var svgW = 960, svgH = 720;
+
+    // Compute how the img is rendered (object-fit:contain)
+    var containerW = chartArea.clientWidth - 24;
+    var containerH = chartArea.clientHeight - 24;
+    var scale = Math.min(containerW / svgW, containerH / svgH);
+    var renderedW = svgW * scale;
+    var renderedH = svgH * scale;
+    var offsetX = (containerW - renderedW) / 2 + 12;
+    var offsetY = (containerH - renderedH) / 2 + 12;
+
+    overlay.style.display = 'block';
+    overlay.innerHTML = '';
+    overlay.setAttribute('viewBox', '0 0 ' + chartArea.clientWidth + ' ' + chartArea.clientHeight);
+
+    var isBar = insight.metadata.chart_type === 'bar_horizontal';
+    var plotArea = insight.plot_area || {};
+    var plotX = plotArea.x || 0;
+    var plotY = plotArea.y || 0;
+    var plotW = plotArea.width || svgW;
+    var plotH = plotArea.height || svgH;
+
+    // X-axis info (value labels for bars, time labels for lines)
+    var xAxis = insight.x_axis || {};
+    var xLabels = xAxis.labels || [];
+    var xPixels = xAxis.pixel_positions || [];
+
+    // Y-axis info (categories for bars, value labels for lines)
+    var yAxis = insight.y_axis || {};
+    var yLabels = yAxis.labels || [];
+    var yPixels = yAxis.pixel_positions || [];
+
+    // Pre-compute analytics & rank for each series
+    var seriesAnalytics = {};
+    insight.series.forEach(function(s) {
+        seriesAnalytics[s.name] = computeSeriesAnalytics(s);
+    });
+
+    // For bar charts: compute rank and percentile of each bar
+    var allBarValues = [];
+    if (isBar && insight.series[0]) {
+        allBarValues = insight.series[0].data_points.map(function(dp) { return dp.value; })
+            .slice().sort(function(a,b){ return b - a; });
+    }
+
+    // Helper: convert SVG pixel to screen pixel
+    function toScreenX(px) { return offsetX + px * scale; }
+    function toScreenY(py) { return offsetY + py * scale; }
+
+    // Helper: build tooltip for a data point
+    function showTooltip(e, dp, series, idx, extraInfo) {
+        var color = series.color || '#3b82f6';
+        var analytics = seriesAnalytics[series.name];
+        var totalPts = series.data_points.length;
+
+        var html = '<div class="tt-series"><span class="tt-dot" style="background:' + color + '"></span>' + (extraInfo.barLabel || series.name) + '</div>';
+
+        if (isBar) {
+            // Bar chart: show category, value, rank, % of max
+            html += '<div class="tt-row"><span class="tt-label">Region</span><span class="tt-value">' + dp.x_label + '</span></div>';
+            html += '<div class="tt-row"><span class="tt-label">Value</span><span class="tt-value" style="font-size:13px;color:#fff">' + dp.value.toFixed(2) + '%</span></div>';
+            if (extraInfo.rank !== undefined) {
+                html += '<div class="tt-row"><span class="tt-label">Rank</span><span class="tt-value">#' + extraInfo.rank + ' of ' + totalPts + '</span></div>';
+            }
+            if (extraInfo.pctOfMax !== undefined) {
+                html += '<div class="tt-row"><span class="tt-label">% of Max</span><span class="tt-value">' + extraInfo.pctOfMax.toFixed(1) + '%</span></div>';
+            }
+            // Show distance from mean
+            if (analytics) {
+                var mean = analytics.range.min + (analytics.range.max - analytics.range.min) / 2;
+                // Use the actual computed mean
+                var vals = series.data_points.map(function(p){ return p.value; });
+                var actualMean = vals.reduce(function(a,b){return a+b;},0) / vals.length;
+                var diffFromMean = dp.value - actualMean;
+                html += '<div class="tt-divider"></div>';
+                html += '<div class="tt-row"><span class="tt-label">Mean</span><span class="tt-value">' + actualMean.toFixed(2) + '%</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">vs Mean</span><span class="tt-value" style="color:' + (diffFromMean >= 0 ? '#22c55e' : '#ef4444') + '">' + (diffFromMean >= 0 ? '+' : '') + diffFromMean.toFixed(2) + '</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">Min</span><span class="tt-value">' + analytics.range.min.toFixed(2) + '</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">Max</span><span class="tt-value">' + analytics.range.max.toFixed(2) + '</span></div>';
+            }
+        } else {
+            // Line chart: show time, value, series context
+            html += '<div class="tt-row"><span class="tt-label">Period</span><span class="tt-value">' + dp.x_label + '</span></div>';
+            html += '<div class="tt-row"><span class="tt-label">Value</span><span class="tt-value" style="font-size:13px;color:#fff">' + dp.value.toFixed(2) + '</span></div>';
+            html += '<div class="tt-row"><span class="tt-label">Point</span><span class="tt-value">' + (idx + 1) + ' of ' + totalPts + '</span></div>';
+
+            // Change from previous point
+            if (idx > 0) {
+                var prev = series.data_points[idx - 1].value;
+                var change = dp.value - prev;
+                var changePct = prev !== 0 ? (change / Math.abs(prev) * 100) : 0;
+                html += '<div class="tt-row"><span class="tt-label">Change</span><span class="tt-value" style="color:' + (change >= 0 ? '#22c55e' : '#ef4444') + '">' + (change >= 0 ? '+' : '') + change.toFixed(2) + ' (' + (changePct >= 0 ? '+' : '') + changePct.toFixed(1) + '%)</span></div>';
+            }
+
+            // Peak/trough/anomaly detection
+            if (analytics) {
+                var isPeak = false, isTrough = false;
+                analytics.peaks.forEach(function(p) { if (p.label === dp.x_label && Math.abs(p.value - dp.value) < 0.01) isPeak = true; });
+                analytics.troughs.forEach(function(t) { if (t.label === dp.x_label && Math.abs(t.value - dp.value) < 0.01) isTrough = true; });
+                if (isPeak) html += '<div class="tt-row"><span class="tt-label">Signal</span><span class="tt-value" style="color:#22c55e">&#9650; Local Peak</span></div>';
+                if (isTrough) html += '<div class="tt-row"><span class="tt-label">Signal</span><span class="tt-value" style="color:#ef4444">&#9660; Local Trough</span></div>';
+            }
+
+            var anomalyInfo = null;
+            (insight.anomalies || []).forEach(function(a) {
+                if (a.series_name === series.name && a.x_label === dp.x_label) anomalyInfo = a;
+            });
+            if (anomalyInfo) {
+                html += '<div class="tt-divider"></div>';
+                html += '<div class="tt-row"><span class="tt-label">&#9888; Anomaly</span><span class="tt-value" style="color:#f59e0b">z-score ' + anomalyInfo.z_score.toFixed(2) + '</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">Severity</span><span class="tt-value" style="color:#f59e0b">' + (anomalyInfo.severity * 100).toFixed(0) + '%</span></div>';
+            }
+
+            if (analytics) {
+                html += '<div class="tt-divider"></div>';
+                html += '<div class="tt-row"><span class="tt-label">Range</span><span class="tt-value">' + analytics.range.min.toFixed(2) + ' – ' + analytics.range.max.toFixed(2) + '</span></div>';
+                html += '<div class="tt-row"><span class="tt-label">Trend</span><span class="tt-value">' + analytics.overallTrend + ' (R²=' + analytics.r2.toFixed(2) + ')</span></div>';
+            }
+        }
+
+        tooltip.innerHTML = html;
+        tooltip.style.display = 'block';
+        positionTooltip(e, tooltip, chartArea);
+    }
+
+    if (isBar) {
+        // === BAR CHART: create a transparent rectangle for each bar ===
+        var series = insight.series[0];
+        if (!series) return;
+        var barLeftScreen = toScreenX(plotX);
+
+        // Compute bar half-height from spacing
+        var barHalfH = 7 * scale; // default: 13/2 px bar height
+        if (series.data_points.length > 1) {
+            var spacing = Math.abs(series.data_points[1].y_pixel - series.data_points[0].y_pixel);
+            barHalfH = (spacing * 0.45) * scale;
+        }
+
+        // Sort by value for ranking
+        var sorted = series.data_points.slice().sort(function(a,b){ return b.value - a.value; });
+        var maxVal = sorted.length > 0 ? sorted[0].value : 1;
+
+        series.data_points.forEach(function(dp, idx) {
+            var barRight = toScreenX(dp.x_pixel);
+            var barCenterY = toScreenY(dp.y_pixel);
+            var barTop = barCenterY - barHalfH;
+            var barHeight = barHalfH * 2;
+            var barWidth = barRight - barLeftScreen;
+
+            // Find rank
+            var rank = 1;
+            for (var r = 0; r < sorted.length; r++) {
+                if (sorted[r].x_label === dp.x_label) { rank = r + 1; break; }
+            }
+
+            var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', barLeftScreen);
+            rect.setAttribute('y', barTop);
+            rect.setAttribute('width', Math.max(barWidth, 10));
+            rect.setAttribute('height', barHeight);
+            rect.setAttribute('fill', 'rgba(255,255,255,0.0)');
+            rect.setAttribute('stroke', 'none');
+            rect.style.pointerEvents = 'all';
+            rect.style.cursor = 'crosshair';
+
+            (function(dp, idx, rank, rect) {
+                rect.addEventListener('mouseenter', function(e) {
+                    rect.setAttribute('fill', 'rgba(255,255,255,0.12)');
+                    showTooltip(e, dp, series, idx, {
+                        barLabel: series.name,
+                        rank: rank,
+                        pctOfMax: maxVal > 0 ? (dp.value / maxVal * 100) : 0
+                    });
+                });
+                rect.addEventListener('mousemove', function(e) {
+                    positionTooltip(e, tooltip, chartArea);
+                });
+                rect.addEventListener('mouseleave', function() {
+                    rect.setAttribute('fill', 'rgba(255,255,255,0.0)');
+                    tooltip.style.display = 'none';
+                });
+            })(dp, idx, rank, rect);
+
+            overlay.appendChild(rect);
+        });
+
+    } else {
+        // === LINE / AREA CHART: circles at each data point ===
+        insight.series.forEach(function(s) {
+            var color = s.color || '#3b82f6';
+
+            s.data_points.forEach(function(dp, idx) {
+                var cx = toScreenX(dp.x_pixel);
+                var cy = toScreenY(dp.y_pixel);
+
+                var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', Math.max(4, 7 - Math.floor(s.data_points.length / 25)));
+                circle.setAttribute('fill', color);
+                circle.setAttribute('stroke', '#fff');
+                circle.setAttribute('stroke-width', '1.5');
+                circle.setAttribute('class', 'hover-point');
+                circle.style.pointerEvents = 'all';
+
+                (function(dp, idx, circle) {
+                    circle.addEventListener('mouseenter', function(e) {
+                        circle.style.opacity = '1';
+                        circle.setAttribute('r', parseInt(circle.getAttribute('r')) + 2);
+                        showTooltip(e, dp, s, idx, {});
+                    });
+                    circle.addEventListener('mousemove', function(e) {
+                        positionTooltip(e, tooltip, chartArea);
+                    });
+                    circle.addEventListener('mouseleave', function() {
+                        circle.style.opacity = '';
+                        circle.setAttribute('r', parseInt(circle.getAttribute('r')) - 2);
+                        tooltip.style.display = 'none';
+                    });
+                })(dp, idx, circle);
+
+                overlay.appendChild(circle);
+            });
+        });
+    }
+}
+
+// === JSON HIGHLIGHT ON HOVER ===
+var highlightedLines = []; // line indices that are highlighted
+
+function buildHighlightLayer() {
+    var textarea = document.getElementById('rawJSON');
+    var layer = document.getElementById('jsonHighlightLayer');
+    if (!textarea || !layer) return;
+    var lines = textarea.value.split('\n');
+    var html = '';
+    for (var i = 0; i < lines.length; i++) {
+        var cls = highlightedLines.indexOf(i) >= 0 ? 'jhl-line jhl-active' : 'jhl-line';
+        html += '<span class="' + cls + '"></span>';
+    }
+    layer.innerHTML = html;
+    layer.style.height = textarea.scrollHeight + 'px';
+    layer.scrollTop = textarea.scrollTop;
+}
+
+function syncHighlightLayer() {
+    highlightedLines = [];
+    buildHighlightLayer();
+}
+
+function syncHighlightScroll() {
+    var textarea = document.getElementById('rawJSON');
+    var layer = document.getElementById('jsonHighlightLayer');
+    if (textarea && layer) layer.scrollTop = textarea.scrollTop;
+}
+
+function highlightJSONPoint(seriesName, dpIndex) {
+    var textarea = document.getElementById('rawJSON');
+    var locator = document.getElementById('jsonLocator');
+    if (!textarea) return;
+
+    var jsonText = textarea.value;
+    var seriesPattern = '"name": "' + seriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"';
+    var seriesPos = jsonText.indexOf(seriesPattern);
+    if (seriesPos < 0) {
+        seriesPattern = '"name":"' + seriesName + '"';
+        seriesPos = jsonText.indexOf(seriesPattern);
+    }
+    if (seriesPos < 0) return;
+
+    var dpArrayStart = jsonText.indexOf('"data_points"', seriesPos);
+    if (dpArrayStart < 0) return;
+    var bracketStart = jsonText.indexOf('[', dpArrayStart);
+    if (bracketStart < 0) return;
+
+    var pos = bracketStart + 1;
+    var dpCount = 0;
+    var targetStart = -1;
+    var targetEnd = -1;
+    while (pos < jsonText.length && dpCount <= dpIndex) {
+        var nextBrace = jsonText.indexOf('{', pos);
+        if (nextBrace < 0) break;
+        if (dpCount === dpIndex) {
+            targetStart = nextBrace;
+            var depth = 1;
+            var p = nextBrace + 1;
+            while (p < jsonText.length && depth > 0) {
+                if (jsonText[p] === '{') depth++;
+                else if (jsonText[p] === '}') depth--;
+                p++;
+            }
+            targetEnd = p;
+            break;
+        }
+        var depth = 1;
+        var p = nextBrace + 1;
+        while (p < jsonText.length && depth > 0) {
+            if (jsonText[p] === '{') depth++;
+            else if (jsonText[p] === '}') depth--;
+            p++;
+        }
+        pos = p;
+        dpCount++;
+    }
+
+    if (targetStart < 0 || targetEnd < 0) return;
+
+    var textBefore = jsonText.substring(0, targetStart);
+    var startLine = textBefore.split('\n').length - 1;
+    var targetText = jsonText.substring(0, targetEnd);
+    var endLine = targetText.split('\n').length - 1;
+
+    highlightedLines = [];
+    for (var ln = startLine; ln <= endLine; ln++) {
+        highlightedLines.push(ln);
+    }
+
+    var jsonTab = document.getElementById('rtab-json');
+    if (jsonTab.classList.contains('hidden')) {
+        switchRightTab('json');
+    }
+
+    buildHighlightLayer();
+
+    textarea.setSelectionRange(targetStart, targetEnd);
+
+    var lineHeight = 16;
+    var scrollTarget = (startLine - 2) * lineHeight;
+    textarea.scrollTop = Math.max(0, scrollTarget);
+    syncHighlightScroll();
+
+    textarea.classList.add('json-highlight');
+    jsonHighlightActive = true;
+
+    if (locator) {
+        locator.textContent = seriesName + ' [' + dpIndex + ']';
+        locator.style.display = 'block';
+    }
+}
+
+function clearJSONHighlight() {
+    var textarea = document.getElementById('rawJSON');
+    var locator = document.getElementById('jsonLocator');
+    if (textarea && jsonHighlightActive) {
+        textarea.classList.remove('json-highlight');
+        jsonHighlightActive = false;
+    }
+    if (locator) locator.style.display = 'none';
+    highlightedLines = [];
+    buildHighlightLayer();
+}
+
+function positionTooltip(e, tooltip, container) {
+    var rect = container.getBoundingClientRect();
+    var x = e.clientX - rect.left + 16;
+    var y = e.clientY - rect.top - 10;
+    // Flip if too close to right edge
+    if (x + tooltip.offsetWidth + 20 > container.clientWidth) {
+        x = e.clientX - rect.left - tooltip.offsetWidth - 16;
+    }
+    // Flip if too close to bottom
+    if (y + tooltip.offsetHeight + 10 > container.clientHeight) {
+        y = e.clientY - rect.top - tooltip.offsetHeight - 10;
+    }
+    if (y < 0) y = 10;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+}
+
+// === CHART RENDERING ===
+function renderChart(insight) {
+    if (chartInstance) chartInstance.destroy();
+    var ctx = document.getElementById('mainChart').getContext('2d');
+    if (insight.metadata.chart_type === 'bar_horizontal') { renderBarChart(ctx, insight); return; }
+
+    var showPeaks = document.getElementById('ovPeaks') && document.getElementById('ovPeaks').checked;
+    var showTroughs = document.getElementById('ovTroughs') && document.getElementById('ovTroughs').checked;
+    var showTrendlines = document.getElementById('ovTrendlines') && document.getElementById('ovTrendlines').checked;
+
+    var datasets = [];
+    insight.series.forEach(function(s) {
+        var values = s.data_points.map(function(p){return p.value;});
+        var labels = s.data_points.map(function(p){return p.x_label;});
+        var color = s.color || '#3b82f6';
+        datasets.push({
+            label: s.name, data: values, borderColor: color,
+            backgroundColor: insight.metadata.chart_type==='area' ? color+'33' : 'transparent',
+            fill: insight.metadata.chart_type==='area',
+            borderWidth: 2, pointRadius: values.length>80?0:2, pointHoverRadius:4, tension:0.3,
+        });
+
+        if (showTrendlines) {
+            var reg = linearRegression(values);
+            var trendData = values.map(function(_,i){ return reg.intercept + reg.slope*i; });
+            datasets.push({
+                label: s.name+' trend', data: trendData, borderColor: color,
+                borderWidth:1, borderDash:[6,3], pointRadius:0, tension:0, fill:false,
+            });
+        }
+        if (showPeaks || showTroughs) {
+            var a = computeSeriesAnalytics(s);
+            if (a && showPeaks) {
+                var peakData = labels.map(function(l){ var p = a.peaks.find(function(pk){return pk.label===l;}); return p?p.value:null; });
+                datasets.push({ label:s.name+' peaks', data:peakData, borderColor:'transparent',
+                    backgroundColor:'#22c55e', pointRadius:5, pointStyle:'triangle', showLine:false,
+                    pointBorderColor:'#22c55e', pointBorderWidth:2, pointBackgroundColor:'transparent' });
+            }
+            if (a && showTroughs) {
+                var troughData = labels.map(function(l){ var t = a.troughs.find(function(tr){return tr.label===l;}); return t?t.value:null; });
+                datasets.push({ label:s.name+' troughs', data:troughData, borderColor:'transparent',
+                    backgroundColor:'#ef4444', pointRadius:5, pointStyle:'triangle', pointRotation:180, showLine:false,
+                    pointBorderColor:'#ef4444', pointBorderWidth:2, pointBackgroundColor:'transparent' });
+            }
+        }
+    });
+
+    var labels = insight.series[0] ? insight.series[0].data_points.map(function(p){return p.x_label;}) : [];
+    chartInstance = new Chart(ctx, {
+        type:'line', data:{labels:labels, datasets:datasets},
+        options:{
+            responsive:true, maintainAspectRatio:false,
+            interaction:{mode:'index',intersect:false},
+            plugins:{
+                legend:{labels:{color:'#666',font:{size:10},filter:function(item){return item.text.indexOf('trend')<0&&item.text.indexOf('peaks')<0&&item.text.indexOf('troughs')<0;}}},
+                tooltip:{backgroundColor:'#1a1a1a',borderColor:'#333',borderWidth:1},
+            },
+            scales:{
+                x:{ticks:{color:'#555',maxTicksLimit:12,font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
+                y:{ticks:{color:'#555',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
+            },
+        },
+    });
+}
+
+function renderBarChart(ctx, insight) {
+    var s = insight.series[0]; if (!s) return;
+    var labels = s.data_points.map(function(p){return p.x_label;});
+    var values = s.data_points.map(function(p){return p.value;});
+    var colors = values.map(function(_,i){ return 'hsla('+(200+i*5)+',70%,55%,0.8)'; });
+    chartInstance = new Chart(ctx, {
+        type:'bar', data:{labels:labels, datasets:[{label:s.name,data:values,backgroundColor:colors,borderWidth:0,borderRadius:3}]},
+        options:{ indexAxis:'y',responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false}},
+            scales:{ x:{ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'}}, y:{ticks:{color:'#999',font:{size:9}},grid:{display:false}} }
+        },
+    });
+}
+
+function updateOverlays() {
+    // Original SVG is displayed as-is; overlays are not applicable
+    return;
+}
+
+// === DEMO & UPLOAD ===
+function triggerUpload() { document.getElementById('fileInput').click(); }
+
+function handleDrop(e) {
+    e.preventDefault();
+    var dz = e.target.closest('#dropzone');
+    if (dz) dz.classList.remove('border-blue-500');
+    handleFiles(e.dataTransfer.files);
+}
+
+async function loadDemo() {
+    showLoading('Loading demo charts...');
+    setPipelineStep('UPLOAD');
+    try {
+        var data = await apiGet('/api/demo');
+        setPipelineStep('PARSE');
+        for (var c of data.charts) {
+            if (!c.error) {
+                var full = await apiGet('/api/charts/' + c.chart_id);
+                charts[c.chart_id] = full;
+                // Fetch the original SVG for display
+                svgData[c.chart_id] = API + '/api/charts/' + c.chart_id + '/svg';
+            }
+        }
+        setPipelineStep('DONE');
+        renderChartSelector();
+        var firstId = Object.keys(charts)[0];
+        if (firstId) selectChart(firstId);
+    } catch(e) { alert('Failed: '+e.message); }
+    hideLoading();
+}
+
+async function handleFiles(files) {
+    showLoading('Processing ' + files.length + ' chart(s)...');
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        if (!file.name.endsWith('.svg')) continue;
+        setPipelineStep('UPLOAD');
+        try {
+            // Read raw SVG as data URL for display
+            var rawSvgUrl = await new Promise(function(resolve) {
+                var reader = new FileReader();
+                reader.onload = function(e) { resolve(e.target.result); };
+                reader.readAsDataURL(file);
+            });
+            var form = new FormData(); form.append('file', file);
+            setPipelineStep('PARSE');
+            var r = await fetch(API+'/api/upload',{method:'POST',body:form,headers:authHeaders()});
+            if (!r.ok) throw new Error('Upload failed: ' + r.status);
+            var data = await r.json();
+            setPipelineStep('DONE');
+            var chartId = data.insight.chart_id;
+            charts[chartId] = data;
+            svgData[chartId] = rawSvgUrl;
+            renderChartSelector();
+            selectChart(chartId);
+        } catch(e) { console.error('Upload error:',e); }
+    }
+    hideLoading();
+}
+
+// === CHART SELECTOR ===
+function renderChartSelector() {
+    var sel = document.getElementById('chartSelector');
+    sel.innerHTML = '<option value="">Select a chart...</option>';
+    Object.keys(charts).forEach(function(id) {
+        var opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = charts[id].insight.metadata.title || id;
+        sel.appendChild(opt);
+    });
+}
+
+// === SELECT CHART ===
+function selectChart(id) {
+    if (!id) return;
+    activeChartId = id;
+    var data = charts[id];
+    if (!data) return;
+    chatHistory = [];
+    document.getElementById('chatMessages').innerHTML = '';
+
+    document.getElementById('welcome').style.display = 'none';
+    var av = document.getElementById('analysisView');
+    av.classList.remove('hidden'); av.style.display = '';
+    document.getElementById('bottomPanel').classList.remove('hidden');
+    document.getElementById('bottomPanel').style.height = bottomPanelHeight + 'px';
+    av.style.height = 'calc(100vh - 42px - ' + bottomPanelHeight + 'px)';
+
+    var meta = data.insight.metadata;
+    var insight = data.insight;
+    var narrative = data.narrative;
+
+    document.getElementById('chartSelector').value = id;
+    document.getElementById('chartTitle').textContent = meta.title;
+
+    var firstLabel = insight.series[0] ? insight.series[0].data_points[0].x_label : '';
+    var lastLabel = insight.series[0] ? insight.series[0].data_points[insight.series[0].data_points.length-1].x_label : '';
+    setMetaBadge('metaPeriod', 'PERIOD ' + firstLabel + ' \u2013 ' + lastLabel);
+    setMetaBadge('metaUnit', 'UNIT ' + (meta.subtitle || ''));
+    setMetaBadge('metaType', 'TYPE ' + meta.chart_type.replace('_',' '));
+    setMetaBadge('metaSeries', 'SERIES ' + insight.series.length);
+    document.getElementById('metaSource').textContent = meta.source ? 'Source: ' + meta.source : '';
+
+    renderExtractedSVG(id);
+    renderSeriesCards(insight);
+    renderPairwiseCorrelations(insight);
+    document.getElementById('rawJSON').value = JSON.stringify(insight, null, 2);
+    originalInsightJSON[id] = JSON.stringify(insight, null, 2);
+    clearComparisonView();
+
+    document.getElementById('narrativeText').innerHTML = formatNarrative(narrative);
+    document.getElementById('disclaimer').classList.remove('hidden');
+    document.getElementById('llmBadge').textContent = narrative.tone ? narrative.tone.toUpperCase() : '';
+    document.getElementById('llmAttempts').textContent = '';
+
+    switchRightTab('series');
+    switchBottomTab('commentary');
+    setPipelineStep('DONE');
+}
+
+function setMetaBadge(id, text) {
+    var el = document.getElementById(id);
+    if (text && text.trim().length > 6) { el.textContent = text; el.classList.remove('hidden'); }
+    else el.classList.add('hidden');
+}
+
+// === TAB SWITCHING ===
+function switchRightTab(name) {
+    document.querySelectorAll('.rtab-content').forEach(function(el){el.classList.add('hidden');});
+    document.querySelectorAll('[data-rtab]').forEach(function(el){el.classList.remove('tab-active');el.classList.add('text-gray-500');});
+    document.getElementById('rtab-'+name).classList.remove('hidden');
+    var btn = document.querySelector('[data-rtab="'+name+'"]');
+    if (btn) {btn.classList.add('tab-active');btn.classList.remove('text-gray-500');}
+}
+
+function switchBottomTab(name) {
+    document.querySelectorAll('.btab-content').forEach(function(el){el.classList.add('hidden');});
+    document.querySelectorAll('[data-btab]').forEach(function(el){
+        el.classList.remove('text-blue-400','border-b-2','border-blue-400');
+        el.classList.add('text-gray-500');
+    });
+    document.getElementById('btab-'+name).classList.remove('hidden');
+    var btn = document.querySelector('[data-btab="'+name+'"]');
+    if (btn) {btn.classList.add('text-blue-400','border-b-2','border-blue-400');btn.classList.remove('text-gray-500');}
+}
+
+var bottomPanelHeight = 252;
+function toggleBottomPanel() {
+    var av = document.getElementById('analysisView');
+    bottomExpanded = !bottomExpanded;
+    if (bottomExpanded) {
+        document.querySelectorAll('.btab-content').forEach(function(el){ el.style.display = ''; });
+        document.getElementById('bottomPanel').style.height = bottomPanelHeight + 'px';
+        av.style.height = 'calc(100vh - 42px - ' + bottomPanelHeight + 'px)';
+        document.getElementById('bottomToggleBtn').innerHTML = '&#9660;';
+    } else {
+        document.querySelectorAll('.btab-content').forEach(function(el){ el.style.display = 'none'; });
+        document.getElementById('bottomPanel').style.height = '32px';
+        av.style.height = 'calc(100vh - 42px - 32px)';
+        document.getElementById('bottomToggleBtn').innerHTML = '&#9650;';
+    }
+}
+
+// === BOTTOM PANEL RESIZE ===
+(function() {
+    var handle = document.getElementById('resizeHandle');
+    var panel = document.getElementById('bottomPanel');
+    var dragging = false;
+    var startY, startH;
+    handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        dragging = true;
+        startY = e.clientY;
+        startH = panel.offsetHeight;
+        handle.classList.add('active');
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        var newH = Math.min(Math.max(startH + (startY - e.clientY), 100), window.innerHeight - 100);
+        panel.style.height = newH + 'px';
+        bottomPanelHeight = newH;
+        var av = document.getElementById('analysisView');
+        if (av) av.style.height = 'calc(100vh - 42px - ' + newH + 'px)';
+    });
+    document.addEventListener('mouseup', function() {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+})();
+
+// === NARRATIVE FORMATTING ===
+function formatNarrative(narrative) {
+    var html = '';
+    if (narrative.summary) {
+        html += '<div class="nar-section"><div class="nar-label">Summary</div><div class="nar-summary">' + escapeHtml(narrative.summary) + '</div></div>';
+    }
+    if (narrative.detailed) {
+        // Split on sentence boundaries: period/!/?  followed by a space and uppercase letter, avoiding splits on decimals
+        var sentences = narrative.detailed.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(function(s){ return s.trim().length > 0; });
+        html += '<div class="nar-section"><div class="nar-label">Detailed Analysis</div><ul class="nar-bullets">';
+        sentences.forEach(function(s) { s = s.trim(); if (s) html += '<li>' + escapeHtml(s) + '</li>'; });
+        html += '</ul></div>';
+    }
+    if (narrative.key_takeaways && narrative.key_takeaways.length) {
+        html += '<div class="nar-section"><div class="nar-label">Key Takeaways</div><ul class="nar-bullets">';
+        narrative.key_takeaways.forEach(function(t) { html += '<li>' + escapeHtml(t) + '</li>'; });
+        html += '</ul></div>';
+    }
+    return html;
+}
+function escapeHtml(str) { var d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+// === NARRATIVE & ACTIONS ===
+async function regenerateWithTone(tone) {
+    closeMenus();
+    if (!activeChartId) return;
+    showLoading('Regenerating...');
+    try {
+        var narrative = await apiPost('/api/narrative', {chart_id:activeChartId, tone:tone});
+        charts[activeChartId].narrative = narrative;
+        document.getElementById('narrativeText').innerHTML = formatNarrative(narrative);
+        document.getElementById('llmBadge').textContent = (narrative.tone||tone).toUpperCase();
+    } catch(e) { alert('Failed: '+e.message); }
+    hideLoading();
+}
+
+function copyNarrative() { navigator.clipboard.writeText(document.getElementById('narrativeText').innerText); }
+function copyJSON() { navigator.clipboard.writeText(document.getElementById('rawJSON').value); }
+
+function exportAs(format) {
+    closeMenus();
+    if (!activeChartId) return;
+    var data = charts[activeChartId];
+    var content, filename, mime;
+    if (format==='json') { content=JSON.stringify(data,null,2); filename='chart-'+activeChartId+'.json'; mime='application/json'; }
+    else if (format==='csv') {
+        var rows = [];
+        data.insight.series.forEach(function(s){ s.data_points.forEach(function(p){ rows.push(s.name+','+p.x_label+','+p.value); }); });
+        content = 'Series,Label,Value\n' + rows.join('\n');
+        filename='chart-'+activeChartId+'.csv'; mime='text/csv';
+    } else {
+        var n = data.narrative;
+        var parts = [n.summary,'',n.detailed,''];
+        (n.key_takeaways||[]).forEach(function(t){ parts.push('\u2022 '+t); });
+        content = parts.join('\n');
+        filename='chart-'+activeChartId+'.txt'; mime='text/plain';
+    }
+    var blob = new Blob([content],{type:mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href=url; a.download=filename; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function toggleRegenMenu() { document.getElementById('exportMenu').classList.add('hidden'); document.getElementById('regenMenu').classList.toggle('hidden'); }
+function toggleExportMenu() { document.getElementById('regenMenu').classList.add('hidden'); document.getElementById('exportMenu').classList.toggle('hidden'); }
+function closeMenus() { var rm = document.getElementById('regenMenu'); if (rm) rm.classList.add('hidden'); var em = document.getElementById('exportMenu'); if (em) em.classList.add('hidden'); }
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#regenMenu')&&!e.target.closest('button')) { var rm = document.getElementById('regenMenu'); if(rm) rm.classList.add('hidden'); }
+    if (!e.target.closest('#exportMenu')&&!e.target.closest('button')) { var em = document.getElementById('exportMenu'); if(em) em.classList.add('hidden'); }
+});
+
+// === CHATBOT ===
+function sendChatMessage() {
+    var input = document.getElementById('chatInput');
+    var question = input.value.trim();
+    if (!question || !activeChartId) return;
+    input.value = '';
+    addChatBubble(question, 'user');
+    var data = charts[activeChartId];
+    var answer = answerFromData(question, data);
+    addChatBubble(answer, 'bot');
+}
+
+function addChatBubble(text, role) {
+    var container = document.getElementById('chatMessages');
+    var div = document.createElement('div');
+    div.className = 'chat-msg rounded-lg px-3 py-2 text-xs ' + (role==='user'?'chat-msg-user':'chat-msg-bot') + ' fade-in';
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    chatHistory.push({role:role, text:text});
+}
+
+function answerFromData(question, data) {
+    var q = question.toLowerCase();
+    var insight = data.insight;
+    var narrative = data.narrative;
+
+    var matchedSeries = null;
+    insight.series.forEach(function(s) {
+        if (q.indexOf(s.name.toLowerCase()) >= 0) matchedSeries = s;
+    });
+
+    if (matchedSeries) {
+        var a = computeSeriesAnalytics(matchedSeries);
+        if (!a) return matchedSeries.name + ' does not have enough data for analysis.';
+
+        if (q.indexOf('trend') >= 0) {
+            return matchedSeries.name + ': Overall trend is ' + a.overallTrend + ' (R\u00B2=' + a.r2.toFixed(2) + ', slope ' + (a.slopePerYear>=0?'+':'') + a.slopePerYear.toFixed(3) + '/yr). Recent trend is ' + a.recent.direction + ' and ' + a.recent.accel + ' (' + a.recent.startLabel + '\u2013' + a.recent.endLabel + ').';
+        }
+        if (q.indexOf('peak') >= 0) {
+            return a.peaks.length ? matchedSeries.name + ' peaks: ' + a.peaks.map(function(p){return p.label+': '+p.value.toFixed(2);}).join(', ') : 'No significant peaks detected for ' + matchedSeries.name + '.';
+        }
+        if (q.indexOf('trough') >= 0 || q.indexOf('low') >= 0 || q.indexOf('minimum') >= 0) {
+            return a.troughs.length ? matchedSeries.name + ' troughs: ' + a.troughs.map(function(t){return t.label+': '+t.value.toFixed(2);}).join(', ') : 'No significant troughs detected for ' + matchedSeries.name + '.';
+        }
+        if (q.indexOf('volatil') >= 0) {
+            return matchedSeries.name + ' volatility is ' + a.volatility + '. Range: ' + a.range.min.toFixed(2) + ' \u2013 ' + a.range.max.toFixed(2) + '.';
+        }
+        if (q.indexOf('momentum') >= 0) {
+            return matchedSeries.name + ' momentum: ' + a.momentum + '.';
+        }
+        if (q.indexOf('value') >= 0 || q.indexOf('current') >= 0 || q.indexOf('latest') >= 0 || q.indexOf('price') >= 0) {
+            return matchedSeries.name + ' latest value: ' + a.latestValue.toFixed(2) + '. Range: ' + a.range.min.toFixed(2) + ' \u2013 ' + a.range.max.toFixed(2) + '.';
+        }
+        return matchedSeries.name + ': ' + a.latestValue.toFixed(2) + ', ' + a.overallTrend + ' trend (R\u00B2=' + a.r2.toFixed(2) + '), ' + a.volatility + ' volatility, ' + a.momentum + ' momentum. Recent: ' + a.recent.direction + ' (' + a.recent.accel + ').';
+    }
+
+    if (q.indexOf('correlat') >= 0) {
+        var corrs = insight.correlations || [];
+        if (!corrs.length) return 'No pairwise correlations available for this chart.';
+        var sorted = corrs.slice().sort(function(a,b){ return Math.abs(b.pearson_r)-Math.abs(a.pearson_r); });
+        return 'Strongest correlations:\n' + sorted.slice(0,5).map(function(c){ return c.series_a+' \u00D7 '+c.series_b+': r='+c.pearson_r.toFixed(3); }).join('\n');
+    }
+
+    if (q.indexOf('anomal') >= 0 || q.indexOf('unusual') >= 0 || q.indexOf('outlier') >= 0) {
+        var anoms = insight.anomalies || [];
+        if (!anoms.length) return 'No anomalies detected in this chart.';
+        return 'Anomalies detected:\n' + anoms.slice(0,5).map(function(a){ return a.series_name+' at '+a.x_label+': '+a.description+' (z='+a.z_score.toFixed(1)+')'; }).join('\n');
+    }
+
+    if (q.indexOf('summary') >= 0 || q.indexOf('summarize') >= 0 || q.indexOf('overview') >= 0) {
+        return narrative.summary || 'No summary available.';
+    }
+
+    if (q.indexOf('series') >= 0 || q.indexOf('list') >= 0) {
+        return 'This chart has ' + insight.series.length + ' series:\n' + insight.series.map(function(s) {
+            var a = computeSeriesAnalytics(s);
+            return a ? '\u2022 ' + s.name + ': ' + a.latestValue.toFixed(2) + ' (' + a.overallTrend + ')' : '\u2022 ' + s.name;
+        }).join('\n');
+    }
+
+    if (q.indexOf('highest') >= 0 || q.indexOf('largest') >= 0 || q.indexOf('biggest') >= 0 || q.indexOf('max') >= 0) {
+        var best = null;
+        insight.series.forEach(function(s) {
+            var a = computeSeriesAnalytics(s);
+            if (a && (!best || a.latestValue > best.val)) best = {name:s.name, val:a.latestValue};
+        });
+        return best ? best.name + ' has the highest current value at ' + best.val.toFixed(2) + '.' : 'Unable to determine.';
+    }
+
+    if (q.indexOf('lowest') >= 0 || q.indexOf('smallest') >= 0 || q.indexOf('min') >= 0) {
+        var worst = null;
+        insight.series.forEach(function(s) {
+            var a = computeSeriesAnalytics(s);
+            if (a && (!worst || a.latestValue < worst.val)) worst = {name:s.name, val:a.latestValue};
+        });
+        return worst ? worst.name + ' has the lowest current value at ' + worst.val.toFixed(2) + '.' : 'Unable to determine.';
+    }
+
+    var seriesNames = insight.series.map(function(s){return s.name;}).join(', ');
+    return 'Chart: ' + insight.metadata.title + '. ' + insight.series.length + ' series (' + seriesNames + '). Try asking about a specific series (e.g. "' + (insight.series[0] ? insight.series[0].name : 'USD') + ' trend"), correlations, anomalies, or peaks/troughs.';
+}
+
+// === HELPERS ===
+function showLoading(text) { document.getElementById('loadingText').textContent=text; document.getElementById('loading').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
+
+// === ZOOM & PAN ===
+function _applyZoomPan(svgEl) {
+    if (!svgEl) svgEl = document.getElementById('extractedSVG');
+    if (!svgEl) return;
+    var w = 960 / currentZoom;
+    var h = 720 / currentZoom;
+    var vx = Math.max(0, Math.min(panX, 960 - w));
+    var vy = Math.max(0, Math.min(panY, 720 - h));
+    panX = vx; panY = vy;
+    svgEl.setAttribute('viewBox', vx + ' ' + vy + ' ' + w + ' ' + h);
+}
+
+function zoomChart(factor) {
+    var svgEl = document.getElementById('extractedSVG');
+    if (!svgEl) return;
+    var newZoom = Math.max(0.5, Math.min(currentZoom * factor, 8));
+    // Zoom toward center of current view
+    var oldW = 960 / currentZoom, oldH = 720 / currentZoom;
+    var newW = 960 / newZoom, newH = 720 / newZoom;
+    panX += (oldW - newW) / 2;
+    panY += (oldH - newH) / 2;
+    currentZoom = newZoom;
+    _applyZoomPan(svgEl);
+}
+
+function zoomReset() {
+    currentZoom = 1; panX = 0; panY = 0;
+    _applyZoomPan();
+}
+
+function _setupZoomEvents() {
+    var wrapper = document.getElementById('svgWrapper');
+    if (!wrapper) return;
+    // Prevent duplicate listeners
+    if (wrapper._zoomBound) return;
+    wrapper._zoomBound = true;
+
+    wrapper.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        var svgEl = document.getElementById('extractedSVG');
+        if (!svgEl) return;
+        var rect = svgEl.getBoundingClientRect();
+        // Mouse position in SVG coords
+        var mx = (e.clientX - rect.left) / rect.width;
+        var my = (e.clientY - rect.top) / rect.height;
+        var oldW = 960 / currentZoom, oldH = 720 / currentZoom;
+
+        var factor = e.deltaY < 0 ? 1.15 : 0.87;
+        var newZoom = Math.max(0.5, Math.min(currentZoom * factor, 8));
+        var newW = 960 / newZoom, newH = 720 / newZoom;
+        // Zoom toward mouse position
+        panX += (oldW - newW) * mx;
+        panY += (oldH - newH) * my;
+        currentZoom = newZoom;
+        _applyZoomPan(svgEl);
+    }, {passive: false});
+
+    // Pan with middle-click or when zoomed with left drag
+    wrapper.addEventListener('mousedown', function(e) {
+        if (currentZoom <= 1) return;
+        if (e.button === 0 || e.button === 1) {
+            isPanning = true;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            wrapper.style.cursor = 'grabbing';
+            e.preventDefault();
+        }
+    });
+    window.addEventListener('mousemove', function(e) {
+        if (!isPanning) return;
+        var svgEl = document.getElementById('extractedSVG');
+        if (!svgEl) return;
+        var rect = svgEl.getBoundingClientRect();
+        var vw = 960 / currentZoom;
+        var vh = 720 / currentZoom;
+        var dx = (e.clientX - panStartX) * (vw / rect.width);
+        var dy = (e.clientY - panStartY) * (vh / rect.height);
+        panX -= dx;
+        panY -= dy;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        _applyZoomPan(svgEl);
+    });
+    window.addEventListener('mouseup', function() {
+        if (isPanning) {
+            isPanning = false;
+            var w = document.getElementById('svgWrapper');
+            if (w) w.style.cursor = '';
+        }
+    });
+}
+
+// === EDITABLE JSON: SAVE & COMPARE ===
+function saveEditedJSON() {
+    var textarea = document.getElementById('rawJSON');
+    var errorEl = document.getElementById('jsonError');
+    errorEl.classList.add('hidden');
+
+    try {
+        var editedInsight = JSON.parse(textarea.value);
+    } catch(e) {
+        errorEl.textContent = 'Invalid JSON: ' + e.message;
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    if (!activeChartId) return;
+
+    modifiedInsight = editedInsight;
+    document.getElementById('resetJSONBtn').classList.remove('hidden');
+
+    showComparisonView(activeChartId, editedInsight);
+}
+
+function resetJSON() {
+    if (!activeChartId || !originalInsightJSON[activeChartId]) return;
+    document.getElementById('rawJSON').value = originalInsightJSON[activeChartId];
+    document.getElementById('jsonError').classList.add('hidden');
+    document.getElementById('resetJSONBtn').classList.add('hidden');
+    modifiedInsight = null;
+    clearComparisonView();
+    renderExtractedSVG(activeChartId);
+}
+
+function clearComparisonView() {
+    var compView = document.getElementById('comparisonView');
+    if (compView) compView.remove();
+    var chartArea = document.getElementById('chartArea');
+    chartArea.style.display = '';
+}
+
+function showComparisonView(chartId, editedInsight) {
+    var data = charts[chartId];
+    if (!data) return;
+
+    var chartArea = document.getElementById('chartArea');
+    chartArea.style.display = 'none';
+
+    var prev = document.getElementById('comparisonView');
+    if (prev) prev.remove();
+
+    var compDiv = document.createElement('div');
+    compDiv.id = 'comparisonView';
+    compDiv.style.cssText = 'display:flex; flex:1; min-width:0; gap:2px; height:100%;';
+
+    var origPane = document.createElement('div');
+    origPane.style.cssText = 'flex:1; display:flex; flex-direction:column; min-width:0; border-right:1px solid rgba(255,255,255,0.08);';
+    origPane.innerHTML = '<div style="padding:4px 8px; font-size:10px; font-weight:700; color:#22c55e; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(34,197,94,0.05);">Original</div>';
+    var origChartDiv = document.createElement('div');
+    origChartDiv.id = 'origChartArea';
+    origChartDiv.style.cssText = 'flex:1; position:relative; background:#0f1117; border-radius:4px; margin:4px; overflow:hidden;';
+    var origWrapper = document.createElement('div');
+    origWrapper.id = 'origSvgWrapper';
+    origWrapper.style.cssText = 'width:100%; height:100%; overflow:hidden;';
+    origChartDiv.appendChild(origWrapper);
+    var origTooltip = document.createElement('div');
+    origTooltip.className = 'comp-tooltip';
+    origTooltip.id = 'origTooltip';
+    origChartDiv.appendChild(origTooltip);
+    origPane.appendChild(origChartDiv);
+
+    var modPane = document.createElement('div');
+    modPane.style.cssText = 'flex:1; display:flex; flex-direction:column; min-width:0;';
+    modPane.innerHTML = '<div style="padding:4px 8px; font-size:10px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(59,130,246,0.05);">Modified</div>';
+    var modChartDiv = document.createElement('div');
+    modChartDiv.id = 'modChartArea';
+    modChartDiv.style.cssText = 'flex:1; position:relative; background:#0f1117; border-radius:4px; margin:4px; overflow:hidden;';
+    var modWrapper = document.createElement('div');
+    modWrapper.id = 'modSvgWrapper';
+    modWrapper.style.cssText = 'width:100%; height:100%; overflow:hidden;';
+    modChartDiv.appendChild(modWrapper);
+    var modTooltip = document.createElement('div');
+    modTooltip.className = 'comp-tooltip';
+    modTooltip.id = 'modTooltip';
+    modChartDiv.appendChild(modTooltip);
+    modPane.appendChild(modChartDiv);
+
+    compDiv.appendChild(origPane);
+    compDiv.appendChild(modPane);
+
+    chartArea.parentNode.insertBefore(compDiv, chartArea);
+
+    renderComparisonSVG(data.insight, 'origSvgWrapper', 'origExtractedSVG', 'origChartArea', 'origTooltip');
+    renderComparisonSVG(editedInsight, 'modSvgWrapper', 'modExtractedSVG', 'modChartArea', 'modTooltip');
+}
+
+function renderComparisonSVG(insight, wrapperId, svgId, chartAreaId, tooltipId) {
+    var wrapper = document.getElementById(wrapperId);
+    if (!wrapper) return;
+
+    var ns = 'http://www.w3.org/2000/svg';
+    var isBar = insight.metadata && insight.metadata.chart_type === 'bar_horizontal';
+
+    function el(tag, attrs) {
+        var e = document.createElementNS(ns, tag);
+        if (attrs) Object.keys(attrs).forEach(function(k) { e.setAttribute(k, String(attrs[k])); });
+        return e;
+    }
+    function txt(x, y, t, attrs) {
+        var a = Object.assign({x:x, y:y, fill:'#ccc', 'font-size':'14', 'font-family':'Arial,sans-serif'}, attrs||{});
+        var e = el('text', a);
+        e.textContent = t;
+        return e;
+    }
+
+    var svg = el('svg', {
+        id: svgId,
+        viewBox: '0 0 960 720',
+        preserveAspectRatio: 'xMidYMid meet',
+        xmlns: ns
+    });
+    svg.style.cssText = 'width:100%;height:100%;border-radius:4px;display:block;';
+
+    svg.appendChild(el('rect', {x:0, y:0, width:960, height:720, fill:'#0f1117', rx:6}));
+    svg.appendChild(txt(20, 40, (insight.metadata && insight.metadata.title)||'', {fill:'#fff','font-size':'22','font-weight':'bold'}));
+    if (insight.metadata && insight.metadata.subtitle) svg.appendChild(txt(20, 62, insight.metadata.subtitle, {fill:'#d0d0d0','font-size':'14'}));
+    if (insight.metadata && insight.metadata.source) svg.appendChild(txt(500, 712, insight.metadata.source, {fill:'#666','font-size':'12','font-style':'italic'}));
+
+    var series = insight.series || [];
+    var totalPts = series.reduce(function(s,se){return s+(se.data_points||[]).length;},0);
+    svg.appendChild(txt(940, 16, totalPts+' pts \u2022 '+series.length+' series', {'font-size':'10', fill:'#555', 'text-anchor':'end'}));
+
+    var pa = insight.plot_area || {};
+    pa = {x: pa.x||130, y: pa.y||90, width: pa.width||800, height: pa.height||520};
+    var xLabels = ((insight.x_axis||{}).labels)||[];
+    var xPixels = ((insight.x_axis||{}).pixel_positions)||[];
+    var yLabels = ((insight.y_axis||{}).labels)||[];
+    var yPixels = ((insight.y_axis||{}).pixel_positions)||[];
+
+    svg.appendChild(el('line', {x1:pa.x, y1:pa.y, x2:pa.x, y2:pa.y+pa.height, stroke:'#444', 'stroke-width':'1'}));
+    svg.appendChild(el('line', {x1:pa.x, y1:pa.y+pa.height, x2:pa.x+pa.width, y2:pa.y+pa.height, stroke:'#444', 'stroke-width':'1'}));
+
+    if (isBar) {
+        for (var i = 0; i < xLabels.length; i++) {
+            var xp = xPixels[i];
+            svg.appendChild(el('line', {x1:xp, y1:pa.y, x2:xp, y2:pa.y+pa.height, stroke:'rgba(255,255,255,0.06)', 'stroke-width':'1', 'stroke-dasharray':'4,4'}));
+            svg.appendChild(txt(xp, pa.y+pa.height+24, xLabels[i], {'font-size':'14', 'text-anchor':'middle', fill:'#aaa'}));
+        }
+        for (var j = 0; j < yLabels.length; j++) {
+            svg.appendChild(txt(pa.x-10, yPixels[j]+5, yLabels[j], {'font-size':'11', 'text-anchor':'end', fill:'#ccc'}));
+        }
+        var barSeries = series[0];
+        if (barSeries && barSeries.data_points) {
+            var barH = 13;
+            if (barSeries.data_points.length > 1) {
+                barH = Math.abs(barSeries.data_points[1].y_pixel - barSeries.data_points[0].y_pixel) * 0.72;
+            }
+            var maxBarVal = Math.max.apply(null, barSeries.data_points.map(function(dp){return dp.value;})) || 1;
+            var compTooltip = document.getElementById(tooltipId);
+            var compChartArea = document.getElementById(chartAreaId);
+            barSeries.data_points.forEach(function(dp, idx) {
+                var barW = Math.max(dp.x_pixel - pa.x, 1);
+                var pct = maxBarVal > 0 ? dp.value / maxBarVal : 0;
+                var hue = (1 - pct) * 220;
+                var barColor = 'hsl('+hue+',70%,50%)';
+                var bar = el('rect', {x:pa.x, y:dp.y_pixel-barH/2, width:barW, height:barH, fill:barColor, rx:2, opacity:'0.9', 'pointer-events':'none'});
+                svg.appendChild(bar);
+                svg.appendChild(txt(dp.x_pixel + 5, dp.y_pixel + 4, dp.value.toFixed(1), {'font-size':'10', fill:'#999', 'pointer-events':'none'}));
+                var hover = el('rect', {x:0, y:dp.y_pixel-barH/2-2, width:960, height:barH+4, fill:'transparent'});
+                hover.style.cursor = 'crosshair';
+                (function(dp, bar, hover, idx, barColor) {
+                    hover.addEventListener('mouseenter', function(e) {
+                        bar.setAttribute('opacity','1');
+                        bar.setAttribute('stroke','#fff');
+                        bar.setAttribute('stroke-width','1.5');
+                        highlightJSONPoint(barSeries.name, idx);
+                        if (compTooltip && compChartArea) {
+                            compTooltip.innerHTML = '<div style="font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:'+barColor+';display:inline-block;"></span>' + dp.x_label + '</div>' +
+                                '<div style="display:flex;justify-content:space-between;"><span style="color:#9ca3af;">Value</span><span style="font-weight:600;color:#fff;">' + dp.value.toFixed(2) + '</span></div>';
+                            compTooltip.style.display = 'block';
+                            positionTooltip(e, compTooltip, compChartArea);
+                        }
+                    });
+                    hover.addEventListener('mousemove', function(e) { if (compTooltip && compChartArea) positionTooltip(e, compTooltip, compChartArea); });
+                    hover.addEventListener('mouseleave', function() {
+                        bar.setAttribute('opacity','0.9');
+                        bar.removeAttribute('stroke');
+                        bar.removeAttribute('stroke-width');
+                        clearJSONHighlight();
+                        if (compTooltip) compTooltip.style.display = 'none';
+                    });
+                })(dp, bar, hover, idx, barColor);
+                svg.appendChild(hover);
+            });
+        }
+    } else {
+        for (var i = 0; i < yLabels.length; i++) {
+            svg.appendChild(el('line', {x1:pa.x, y1:yPixels[i], x2:pa.x+pa.width, y2:yPixels[i], stroke:'rgba(255,255,255,0.06)', 'stroke-width':'1'}));
+            svg.appendChild(txt(pa.x-10, yPixels[i]+5, yLabels[i], {'font-size':'12', 'text-anchor':'end', fill:'#aaa'}));
+        }
+        for (var j = 0; j < xLabels.length; j++) {
+            svg.appendChild(el('line', {x1:xPixels[j], y1:pa.y+pa.height, x2:xPixels[j], y2:pa.y+pa.height+8, stroke:'#555', 'stroke-width':'1'}));
+            svg.appendChild(txt(xPixels[j], pa.y+pa.height+22, xLabels[j], {'font-size':'12', 'text-anchor':'middle', fill:'#aaa'}));
+        }
+        var legX = pa.x, legY = pa.y + pa.height + 46;
+        var compTooltip = document.getElementById(tooltipId);
+        var compChartArea = document.getElementById(chartAreaId);
+        series.forEach(function(s, si) {
+            var color = s.color || 'hsl(' + (si*45) + ',70%,55%)';
+            var dps = s.data_points || [];
+            if (insight.metadata && insight.metadata.chart_type === 'area' && dps.length > 1) {
+                var apts = dps.map(function(dp){return dp.x_pixel+','+dp.y_pixel;}).join(' ');
+                apts += ' ' + dps[dps.length-1].x_pixel + ',' + (pa.y+pa.height);
+                apts += ' ' + dps[0].x_pixel + ',' + (pa.y+pa.height);
+                svg.appendChild(el('polygon', {points:apts, fill:color, 'fill-opacity':'0.12', stroke:'none'}));
+            }
+            if (dps.length > 0) {
+                var pts = dps.map(function(dp){return dp.x_pixel+','+dp.y_pixel;}).join(' ');
+                svg.appendChild(el('polyline', {points:pts, fill:'none', stroke:color, 'stroke-width':'2', 'stroke-linejoin':'round', 'pointer-events':'none'}));
+            }
+            var baseR = Math.max(3, 5 - Math.floor(dps.length / 30));
+            dps.forEach(function(dp, idx) {
+                var c = el('circle', {cx:dp.x_pixel, cy:dp.y_pixel, r:baseR, fill:color, stroke:'#0f1117', 'stroke-width':'1.5', opacity:'0'});
+                c.style.cssText = 'cursor:crosshair;transition:opacity 0.12s;';
+                (function(dp, idx, c, sName, color, baseR) {
+                    c.addEventListener('mouseenter', function(e) {
+                        c.setAttribute('opacity','1');
+                        c.setAttribute('r', baseR + 2);
+                        highlightJSONPoint(sName, idx);
+                        if (compTooltip && compChartArea) {
+                            var html = '<div style="font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:'+color+';display:inline-block;"></span>' + sName + '</div>';
+                            html += '<div style="display:flex;justify-content:space-between;"><span style="color:#9ca3af;">Period</span><span style="font-weight:600;">' + dp.x_label + '</span></div>';
+                            html += '<div style="display:flex;justify-content:space-between;"><span style="color:#9ca3af;">Value</span><span style="font-weight:600;color:#fff;">' + dp.value.toFixed(2) + '</span></div>';
+                            if (idx > 0) {
+                                var prev = dps[idx-1].value;
+                                var chg = dp.value - prev;
+                                html += '<div style="display:flex;justify-content:space-between;"><span style="color:#9ca3af;">Change</span><span style="font-weight:600;color:' + (chg>=0?'#22c55e':'#ef4444') + ';">' + (chg>=0?'+':'') + chg.toFixed(2) + '</span></div>';
+                            }
+                            html += '<div style="border-top:1px solid rgba(255,255,255,0.08);margin:4px 0;"></div>';
+                            html += '<div style="text-align:center;font-size:8px;color:#3b82f6;">\u2190 JSON synced</div>';
+                            compTooltip.innerHTML = html;
+                            compTooltip.style.display = 'block';
+                            positionTooltip(e, compTooltip, compChartArea);
+                        }
+                    });
+                    c.addEventListener('mousemove', function(e) { if (compTooltip && compChartArea) positionTooltip(e, compTooltip, compChartArea); });
+                    c.addEventListener('mouseleave', function() {
+                        c.setAttribute('opacity','0');
+                        c.setAttribute('r', baseR);
+                        clearJSONHighlight();
+                        if (compTooltip) compTooltip.style.display = 'none';
+                    });
+                })(dp, idx, c, s.name, color, baseR);
+                svg.appendChild(c);
+            });
+            svg.appendChild(el('line', {x1:legX, y1:legY-4, x2:legX+14, y2:legY-4, stroke:color, 'stroke-width':'3'}));
+            svg.appendChild(txt(legX+18, legY, s.name, {'font-size':'10', fill:'#bbb'}));
+            legX += Math.max(s.name.length * 6, 40) + 34;
+            if (legX > 920) { legX = pa.x; legY += 16; }
+        });
+    }
+
+    wrapper.appendChild(svg);
+}
+
+// Rebuild on resize
+window.addEventListener('resize', function() {
+    if (activeChartId) {
+        if (modifiedInsight && document.getElementById('comparisonView')) {
+            showComparisonView(activeChartId, modifiedInsight);
+        } else {
+            renderExtractedSVG(activeChartId);
+        }
+    }
+});
+</script>
+</body>
+</html>

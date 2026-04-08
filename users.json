@@ -1,0 +1,17 @@
+{
+  "ananya.pendlikal@lseg.com": {
+    "user_id": "a435cf4f",
+    "email": "ananya.pendlikal@lseg.com",
+    "password_hash": "$2b$12$wuk816RPAK.mVno5kPbYXeIOmf0o/TYWNt20.7uDtLwhrDfErDVmi"
+  },
+  "test@gmail.com": {
+    "user_id": "62dabaae",
+    "email": "test@gmail.com",
+    "password_hash": "$2b$12$SqNJ/tljU9zz5mpFZ/BxHe9T1cpzrspoLFgMX3h6EIQEyPTTKVESG"
+  },
+  "test@test.com": {
+    "user_id": "79d36d9e",
+    "email": "test@test.com",
+    "password_hash": "$2b$12$m5IdrmNmzzcbH50a.Mtny.m1NbPNWNHzQqQuiJ8QkWOFVd9fekQbG"
+  }
+}
